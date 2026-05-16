@@ -7,15 +7,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy dependency files
-COPY pyproject.toml ./
+# Copy project metadata first
+COPY pyproject.toml README.md ./
+
+# Copy source code
 COPY src/ ./src/
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -e .
+RUN python -m pip install --upgrade pip setuptools wheel \
+    && pip install --no-cache-dir -e .
 
-# Expose port
-EXPOSE 8080
+# Render Web Service port
+EXPOSE 10000
 
 # Start server
-CMD ["uvicorn", "evograph.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["sh", "-c", "uvicorn evograph.main:app --host 0.0.0.0 --port ${PORT:-10000}"]
