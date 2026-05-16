@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.graph-node-person { fill: #3b82f6; }
+.graph-node-organization { fill: #10b981; }
+.graph-node-product { fill: #f59e0b; }
+.graph-node-event { fill: #ef4444; }
+.graph-node-location { fill: #8b5cf6; }
+.graph-node-technology { fill: #06b6d4; }
+.graph-node-concept { fill: #6b7280; }
+
+.graph-link {
+  stroke: #94a3b8;
+  stroke-opacity: 0.6;
+}
+
+.graph-link-conflict {
+  stroke: #ef4444;
+  stroke-dasharray: 4 2;
+}
