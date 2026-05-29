@@ -95,14 +95,35 @@ def list_commits(repo_path: str, max_commits: int | None = None, branch: str = "
     return commits
 
 
-def _list_py_files_at(repo_path: str, rev: str) -> list[str]:
-    """All .py files tracked at a given revision."""
-    out = _run_git(repo_path, ["ls-tree", "-r", "--name-only", rev])
-    return [p for p in out.splitlines() if p.endswith(".py")]
+def _list_py_blobs_at(repo_path: str, rev: str) -> list[tuple[str, str]]:
+    """Return (blob_sha, path) for every .py file tracked at a given revision.
+
+    The blob SHA is git's content hash: two files (across commits or paths) with
+    identical bytes share a blob SHA. That identity is what lets us parse each
+    distinct file content exactly once instead of once per commit.
+    """
+    # Without --name-only, ls-tree emits: "<mode> <type> <sha>\t<path>".
+    out = _run_git(repo_path, ["ls-tree", "-r", rev])
+    blobs: list[tuple[str, str]] = []
+    for line in out.splitlines():
+        if "\t" not in line:
+            continue
+        meta, path = line.split("\t", 1)
+        if not path.endswith(".py"):
+            continue
+        parts = meta.split()
+        if len(parts) < 3 or parts[1] != "blob":
+            continue
+        blobs.append((parts[2], path))
+    return blobs
 
 
 def _read_file_at(repo_path: str, rev: str, path: str) -> str | None:
-    """File contents at a revision, or None if unreadable/binary."""
+    """File contents at a revision, or None if unreadable/binary.
+
+    Kept as a single-file convenience; the history walk uses the batched
+    `_batch_read_blobs` path instead to avoid a subprocess per file.
+    """
     try:
         raw = _run_git(repo_path, ["show", f"{rev}:{path}"], binary=True)
     except GitHistoryError:
@@ -111,6 +132,59 @@ def _read_file_at(repo_path: str, rev: str, path: str) -> str | None:
         return raw.decode("utf-8")
     except UnicodeDecodeError:
         return None
+
+
+def _batch_read_blobs(repo_path: str, shas: list[str]) -> dict[str, str | None]:
+    """Read many blobs in ONE `git cat-file --batch` call.
+
+    Returns {blob_sha: decoded_text or None}. None means the blob is missing or
+    not valid UTF-8 (e.g. binary). An empty input list spawns no subprocess.
+
+    This collapses what used to be one `git show` per file into a single git
+    invocation per commit — the main lever against the subprocess storm.
+    """
+    if not shas:
+        return {}
+    # Feed all OIDs via stdin; subprocess.run handles the write/read concurrency
+    # internally (communicate), so a full pipe buffer can't deadlock us.
+    stdin = ("\n".join(shas) + "\n").encode("utf-8")
+    try:
+        proc = subprocess.run(
+            ["git", "-C", repo_path, "cat-file", "--batch"],
+            input=stdin,
+            capture_output=True,
+            check=True,
+        )
+    except FileNotFoundError as exc:
+        raise GitHistoryError("git executable not found on PATH") from exc
+    except subprocess.CalledProcessError as exc:
+        stderr = exc.stderr.decode("utf-8", "replace") if exc.stderr else ""
+        raise GitHistoryError(f"git cat-file --batch failed: {stderr.strip()}") from exc
+
+    data = proc.stdout
+    out: dict[str, str | None] = {}
+    i, n = 0, len(data)
+    while i < n:
+        # Each record starts with a header line: "<sha> <type> <size>\n"
+        # or, for an unknown object, "<sha> missing\n".
+        nl = data.find(b"\n", i)
+        if nl == -1:
+            break
+        header = data[i:nl].decode("utf-8", "replace").split()
+        i = nl + 1
+        if len(header) == 2 and header[1] == "missing":
+            out[header[0]] = None
+            continue
+        if len(header) < 3:
+            break
+        sha, size = header[0], int(header[2])
+        content = data[i : i + size]
+        i += size + 1  # skip the trailing newline git appends after content
+        try:
+            out[sha] = content.decode("utf-8")
+        except UnicodeDecodeError:
+            out[sha] = None
+    return out
 
 
 def _changed_py_files(repo_path: str, rev: str) -> list[str]:
@@ -146,18 +220,43 @@ def load_commit_snapshot(
     commit: CommitInfo,
     src_prefixes: tuple[str, ...] = ("src/", "lib/"),
     max_files: int | None = None,
+    parse_cache: dict[tuple[str, str], ParseResult] | None = None,
 ) -> CommitSnapshot:
-    """Parse every .py file as it existed at `commit`."""
-    files = _list_py_files_at(repo_path, commit.sha)
+    """Parse every .py file as it existed at `commit`.
+
+    `parse_cache` maps (blob_sha, path) -> ParseResult and is shared across
+    commits by `iter_history`. A blob SHA uniquely identifies file content, so
+    an unchanged file (same content at the same path) is parsed exactly once for
+    the entire history instead of once per commit. We include the path in the
+    key because the parser derives module/qualified names from it — the same
+    blob at a different path (e.g. after a rename) must be parsed under its new
+    module name, not reused. Cached ParseResults are treated as read-only by all
+    consumers (the adapter and the breaking-change detector only read them), so
+    sharing one object across snapshots is safe.
+    """
+    cache = parse_cache if parse_cache is not None else {}
+    blobs = _list_py_blobs_at(repo_path, commit.sha)
     if max_files:
-        files = files[:max_files]
+        blobs = blobs[:max_files]
+
+    # Only fetch blobs whose (sha, path) we haven't parsed yet.
+    missing = sorted({sha for sha, path in blobs if (sha, path) not in cache})
+    contents = _batch_read_blobs(repo_path, missing)
+
     parses: list[ParseResult] = []
-    for path in files:
-        source = _read_file_at(repo_path, commit.sha, path)
+    for sha, path in blobs:
+        cached = cache.get((sha, path))
+        if cached is not None:
+            parses.append(cached)
+            continue
+        source = contents.get(sha)
         if source is None:
             continue
         module = _module_name(path, src_prefixes)
-        parses.append(parse_python_source(source, module, path))
+        result = parse_python_source(source, module, path)
+        cache[(sha, path)] = result
+        parses.append(result)
+
     changed = _changed_py_files(repo_path, commit.sha)
     return CommitSnapshot(commit=commit, parses=parses, changed_files=changed)
 
@@ -169,9 +268,19 @@ def iter_history(
     src_prefixes: tuple[str, ...] = ("src/", "lib/"),
     max_files: int | None = None,
 ):
-    """Yield CommitSnapshot for each commit, oldest first."""
+    """Yield CommitSnapshot for each commit, oldest first.
+
+    A single (blob, path)->ParseResult cache is shared across the whole walk, so
+    files that don't change between commits are parsed only once. This turns the
+    cost from O(commits × files) down to O(distinct file versions).
+    """
+    parse_cache: dict[tuple[str, str], ParseResult] = {}
     for commit in list_commits(repo_path, max_commits=max_commits, branch=branch):
         yield load_commit_snapshot(
-            repo_path, commit, src_prefixes=src_prefixes, max_files=max_files
+            repo_path,
+            commit,
+            src_prefixes=src_prefixes,
+            max_files=max_files,
+            parse_cache=parse_cache,
         )
 
