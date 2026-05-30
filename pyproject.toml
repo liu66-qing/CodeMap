@@ -1,11 +1,11 @@
 [project]
-name = "pulsegraph"
+name = "gitgraph"
 version = "1.0.0"
-description = "PulseGraph - Multi-source Information Pulse Graph Intelligence Analysis System"
+description = "GitGraph - 基于 Agentic RAG 的代码演化分析引擎（git 历史驱动的破坏性变更检测）"
 readme = "README.md"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.11"
-authors = [{name = "PulseGraph Team"}]
+authors = [{name = "GitGraph"}]
 
 dependencies = [
     "fastapi==0.115.6",

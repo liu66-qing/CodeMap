@@ -41,7 +41,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
-        description="Real-time Knowledge Graph Evolution Agent - Agentic RAG",
+        description="GitGraph - 基于 Agentic RAG 的代码演化分析引擎（git 历史驱动的破坏性变更检测）",
         version="0.1.0",
         lifespan=lifespan,
     )
