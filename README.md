@@ -1,321 +1,425 @@
-<p align="center">
-  <img src="docs/assets/logo.svg" width="140" alt="GitGraph Logo"/>
-</p>
+# CodeGraph
 
-<h1 align="center">GitGraph</h1>
-<h3 align="center">基于 Agentic RAG 的代码演化分析引擎</h3>
-
-<p align="center">
-  <em>把时序知识图谱接到 git 历史，自动定位"破坏性变更"——静态分析工具做不到的事。</em>
-</p>
-
-<p align="center">
-  <a href="#"><img src="https://img.shields.io/badge/python-3.11+-blue.svg?style=flat-square" alt="Python"/></a>
-  <a href="#"><img src="https://img.shields.io/badge/react-18.3-61dafb.svg?style=flat-square&logo=react" alt="React"/></a>
-  <a href="#"><img src="https://img.shields.io/badge/FastAPI-0.115-009688.svg?style=flat-square&logo=fastapi" alt="FastAPI"/></a>
-  <a href="#"><img src="https://img.shields.io/badge/Neo4j-5.x-008CC1.svg?style=flat-square&logo=neo4j" alt="Neo4j"/></a>
-  <a href="#"><img src="https://img.shields.io/badge/license-Apache--2.0-green.svg?style=flat-square" alt="License"/></a>
-</p>
-
-<p align="center">
-  <a href="#这是什么">这是什么</a> &bull;
-  <a href="#核心差异化">核心差异化</a> &bull;
-  <a href="#架构">架构</a> &bull;
-  <a href="#快速开始">快速开始</a> &bull;
-  <a href="#api-参考">API</a> &bull;
-  <a href="#技术栈">技术栈</a>
-</p>
+<div align="center">
+  <img src="./github标题背景图.png" alt="CodeGraph - Transform Complex Repositories into Learning Adventures" width="100%">
+  
+  **🎮 Transform Complex Repositories into Pixel Game Learning Adventures**
+  
+  [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+  [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+  
+  [English](#english) | [中文](#中文)
+</div>
 
 ---
 
-## 这是什么
+<a name="english"></a>
 
-GitGraph 是一个 **Agentic RAG（智能体检索增强）代码分析引擎**。它不止于"对代码做问答"，而是把一整个 git 仓库的历史逐 commit 重建为**时序代码知识图谱**，从而回答静态工具回答不了的问题：
+## 🌟 What is CodeGraph?
 
-> **"哪一个 commit 改坏了这个函数的契约，而当时还有谁在调用它？"**
+**CodeGraph** is a pixel game-inspired learning platform that turns intimidating GitHub repositories into guided learning journeys. Instead of drowning in thousands of files, you follow a structured 4-stage path designed by an AI-powered mentor:
 
-给定一个本地 git 仓库，GitGraph 会自动：
+1. **先看门道 (Overview)** - Understand the repository's positioning, tech stack, and architecture
+2. **跑通主线 (Main Flow)** - Run the project and trace key execution paths
+3. **拆它绝活 (Core Tricks)** - Dissect brilliant implementation patterns worth stealing
+4. **抄走一招 (Apply It)** - Extract reusable concepts to solve your own problems
 
-1. **确定性解析** —— 用 Python 内置 `ast` 把每份源码解析成 模块/类/函数/方法 节点 + `IMPORTS`/`CALLS`/`INHERITS`/`DEFINES` 边（零 LLM、可复现、精确）。
-2. **逐 commit 重建** —— 沿 git 历史回放，为每个时间点重建当时的代码图谱（时序版本化）。
-3. **破坏性变更检测** —— 按 `parent_sha` 比对相邻 commit 的函数签名，检测 **签名变更 / 必填参数新增 / 函数删除**，且仅当被改符号**仍被调用**时才判定为破坏性（高信号、低噪声）。
-4. **图谱入库** —— 复用图合并器把代码图谱写入 Neo4j，破坏性变更存为链到 `:Commit` 的 `:Conflict` 节点。
-5. **Agent 问答** —— 通过 Function Calling 暴露 `find_callers` / `find_dependencies` / `get_symbol_history` / `find_breaking_changes` 等代码工具。
-6. **可视化** —— 代码图谱、演化时间线、破坏性变更看板。
+### 💡 Why CodeGraph?
 
+Great repositories aren't meant to be brute-forced. They contain years of accumulated wisdom, design patterns, and battle-tested solutions. **CodeGraph makes that wisdom accessible** by:
 
----
-
-<a name="核心差异化"></a>
-## 核心差异化
-
-主流代码图谱/静态分析工具（如 GitNexus 一类）只看**单一快照**：当前代码长什么样、谁调用谁。GitGraph 多了一个维度——**时间**。
-
-```
-静态分析：  仓库当前状态  ──►  "X 调用了 Y"
-                                （一张静态图）
-
-GitGraph：  commit₁ → commit₂ → … → commitₙ  ──►  "commit₄7 把 get_user 的签名改了，
-            （每个 commit 一张图，按 parent 串联）      而 service.load 当时还在调它 —— 破坏性"
-```
-
-**为什么"仍被调用"这个条件是关键**：一个没人调用的函数改签名、被删除，都无所谓。只有当契约变更**击中实际依赖方**时才是真正的风险。GitGraph 用这一条把噪声压到最低——它报出来的每一条，都是值得人看的。
-
-### 破坏性变更的三种类型
-
-| 类型 | 触发条件 | 示例 |
-|------|---------|------|
-| `REQUIRED_PARAM_ADDED` | 新增必填参数，老调用方会少传参 | `get_user(uid)` → `get_user(uid, tenant)` |
-| `SIGNATURE_CHANGED` | 签名变更（且仍被调用） | 参数改名/改顺序/类型注解变动 |
-| `SYMBOL_REMOVED` | 函数被删除，但仍有调用方引用 | 删了 `util.fmt`，而 `legacy.old` 还在调 |
-
-### 降噪策略
-- 仅当**新快照**中仍存在调用方时才判定签名变更为破坏性。
-- 删除检测会先看同名可调用符号是否在别处仍然存在——若存在，判定为"移动/重写"而非"删除"，避免文件改名误报。
-- 按 `parent_sha` 而非时间顺序比对，正确处理**非线性历史**（合并、多根 commit）——时间相邻但不在同一分支的 commit 不会产生巨量虚假 diff。
-
+- 🎯 **Structuring chaos** - Transforms 100k+ lines into a clear learning roadmap
+- 🤖 **AI-powered guidance** - Graph-enhanced RAG analyzes code relationships and surfaces insights
+- 🎮 **Game-like experience** - Pixel art + progress tracking keeps you motivated
+- 📊 **Visual knowledge graphs** - Neo4j-powered dependency and concept mapping
+- 🚀 **Production-ready patterns** - Learn by studying real-world, battle-tested code
 
 ---
 
-<a name="架构"></a>
-## 架构
+## 🎯 Core Features
 
-```mermaid
-graph TB
-    subgraph Ingest["代码摄取层"]
-        GIT[git_loader<br/>逐 commit 遍历历史]
-        AST[code_parser<br/>ast 确定性解析]
-        ADP[code_graph_adapter<br/>跨文件符号解析]
-    end
+### 🗺️ **Learning Path System**
+Transform any GitHub repository into a structured 4-stage learning journey. Each stage focuses on a specific learning objective with curated content and guided exploration.
 
-    subgraph Evolution["演化分析层"]
-        BCD[breaking_change_detector<br/>相邻 commit 签名比对]
-        PIPE[code_repo_pipeline<br/>串联入图]
-        MG[graph_merger<br/>图合并/版本化]
-    end
+### 🤖 **Graph-Enhanced RAG**
+- **Code Comprehension Pipeline**: 6-agent system (type/API/flow/pattern/arch analyzers + orchestrator)
+- **Neo4j Knowledge Graph**: Captures function dependencies, call hierarchies, and concept relationships
+- **Smart Context Assembly**: Hybrid retrieval combining graph traversal with vector similarity
 
-    subgraph Agent["Agentic RAG 核心"]
-        ENG[State Machine 引擎]
-        FC[Function Calling 工具选择]
-        TOOLS[代码工具<br/>find_callers / get_symbol_history ...]
-    end
+### 🎨 **Pixel Game Interface**
+Stardew Valley-inspired UI with:
+- Journey map with interactive stage cards
+- Character-driven progress tracking
+- Asset-driven pixel art backgrounds
+- Smooth animations and hover effects
 
-    subgraph Storage["存储层"]
-        NEO[(Neo4j<br/>代码图谱 + :Commit + :Conflict)]
-        QD[(Qdrant 向量)]
-        RD[(Redis 缓存/队列)]
-    end
-
-    subgraph Frontend["React 前端"]
-        GE[代码图谱浏览器]
-        TL[演化时间线]
-        CF[破坏性变更看板]
-        QC[智能问答]
-    end
-
-    GIT --> AST --> ADP --> PIPE
-    GIT --> BCD
-    PIPE --> MG --> NEO
-    BCD --> PIPE
-    Agent --> NEO & QD
-    FC --> TOOLS --> NEO
-    ENG --> FC
-    Frontend --> NEO
-```
-
-### 核心数据流
-
-```
-本地 git 仓库
-    │  git_loader: ls-tree 拿 (blob_sha, path) + cat-file --batch 批量读
-    ▼
-逐 commit 快照（blob 缓存：未改动文件全程只解析一次）
-    │  code_parser: ast → 模块/类/函数/方法 节点 + 4 类边
-    ▼
-每个 commit 的代码图谱（ParseResult 列表）
-    │  ├─ code_graph_adapter: 跨文件解析 self./裸名/点号调用 → 入图
-    │  └─ breaking_change_detector: 按 parent_sha 比对相邻快照
-    ▼
-Neo4j：:Entity（代码符号，带 repo_id）+ RELATION 边
-       :Commit（带 PARENT 链、符号/文件计数）
-       :Conflict（破坏性变更，链到引入它的 :Commit + 受影响 :Entity）
-```
-
+### 📊 **Repository Analytics**
+- Architecture overview with component breakdown
+- Tech stack detection and visualization
+- Execution flow diagrams
+- Core pattern extraction
 
 ---
 
-<a name="快速开始"></a>
-## 快速开始
+## 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│                    Frontend (React)                 │
+│  • Mantine UI + Custom Pixel Components             │
+│  • Journey Map, Stage Views, Knowledge Graph Viz    │
+└──────────────────┬──────────────────────────────────┘
+                   │
+┌──────────────────┴──────────────────────────────────┐
+│              Backend (FastAPI)                      │
+│  ┌─────────────────────────────────────────────┐   │
+│  │  Code Comprehension Layer (6 Agents)        │   │
+│  │  • TypeAnalyzer  • APIAnalyzer              │   │
+│  │  • FlowAnalyzer  • PatternAnalyzer          │   │
+│  │  • ArchAnalyzer  • Orchestrator             │   │
+│  └─────────────────────────────────────────────┘   │
+│                                                      │
+│  ┌─────────────────────────────────────────────┐   │
+│  │  RAG Pipeline                               │   │
+│  │  • Graph Traversal (Neo4j)                  │   │
+│  │  • Vector Search (Chroma)                   │   │
+│  │  • Hybrid Ranking & Context Assembly        │   │
+│  └─────────────────────────────────────────────┘   │
+└──────────────────┬──────────────────────────────────┘
+                   │
+      ┌────────────┴────────────┐
+      │                         │
+┌─────┴──────┐          ┌──────┴─────┐
+│  Neo4j     │          │  ChromaDB  │
+│  Graph DB  │          │  Vector DB │
+└────────────┘          └────────────┘
+```
+
+### Tech Stack
+
+**Frontend**
+- React 18 + TypeScript
+- Mantine UI (structure) + Custom Pixel Skin (style)
+- React Router for stage navigation
+- Lucide React for icons
+- Vite for build tooling
+
+**Backend**
+- FastAPI (Python 3.11+)
+- LangChain for LLM orchestration
+- Neo4j for knowledge graph
+- ChromaDB for vector embeddings
+- Tree-sitter for code parsing
+
+**Infrastructure**
+- Docker + Docker Compose
+- GitHub API integration
+- Claude API for AI comprehension
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- Python 3.11+
+- Docker & Docker Compose
+- Neo4j instance (or use Docker)
+- Claude API key
+
+### Installation
+
+1. **Clone the repository**
+```bash
+git clone https://github.com/liu66-qing/CodeGraph.git
+cd CodeGraph
+```
+
+2. **Set up environment variables**
+```bash
+# Backend
+cp backend/.env.example backend/.env
+# Edit backend/.env and add your Claude API key
+```
+
+3. **Start infrastructure**
+```bash
+docker-compose up -d
+```
+
+4. **Install frontend dependencies**
+```bash
+cd frontend
+npm install
+```
+
+5. **Install backend dependencies**
+```bash
+cd backend
+pip install -r requirements.txt
+```
+
+6. **Run the application**
+
+Terminal 1 (Backend):
+```bash
+cd backend
+uvicorn main:app --reload --port 8000
+```
+
+Terminal 2 (Frontend):
+```bash
+cd frontend
+npm run dev
+```
+
+Visit `http://localhost:5173` to start exploring repositories!
+
+---
+
+## 📖 Usage
+
+1. **Paste a GitHub repository URL** (e.g., `facebook/react`)
+2. **Wait for analysis** - CodeGraph will:
+   - Clone and parse the repository
+   - Build a knowledge graph of dependencies
+   - Generate embeddings for semantic search
+   - Run the 6-agent comprehension pipeline
+3. **Follow the learning path**:
+   - Stage 1: Get the big picture
+   - Stage 2: Trace execution flows
+   - Stage 3: Study implementation patterns
+   - Stage 4: Extract reusable techniques
+4. **Chat with the codebase** - Ask questions at any stage
+
+---
+
+## 🎨 Design Philosophy
+
+### Asset-Driven Art Direction
+CodeGraph's pixel art style is built on licensed asset packs, not CSS tricks:
+- **Ansimuz Sunny Land** - Colorful village scenes
+- **Kenney Pixel Characters** - Sprite sheets for the mentor
+- Custom-composed backgrounds for hero & journey map
+
+### Game-Like Learning
+- Progress tracking with XP and milestones
+- Stage cards as signposts on a journey map
+- Visual feedback for completed stages
+- Mentor character guidance throughout
+
+### Graph-First Architecture
+Unlike pure RAG systems, CodeGraph:
+- **Understands relationships** - Function calls, imports, inheritance
+- **Preserves structure** - Graph traversal before vector search
+- **Surfaces connections** - Shows how concepts relate, not just definitions
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+Key areas where we need help:
+- 📊 Additional repository analytics
+- 🎨 More pixel art assets and themes
+- 🌐 Support for more languages (currently focused on TypeScript/JavaScript)
+- 🧪 Test coverage improvements
+- 📝 Documentation and tutorials
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see [LICENSE](LICENSE) for details.
+
+---
+
+## 🙏 Acknowledgments
+
+- **Asset Packs**: Ansimuz (Sunny Land), Kenney (Pixel Characters, Voxel Pack)
+- **Inspiration**: Stardew Valley's cozy game aesthetic
+- **Tech**: Built with Anthropic Claude, LangChain, Neo4j, and modern web stack
+
+---
+
+<a name="中文"></a>
+
+## 🌟 CodeGraph 是什么？
+
+**CodeGraph** 是一个像素游戏风格的代码学习平台,将复杂的 GitHub 仓库转化为结构化的学习旅程。不再迷失在成千上万的文件中,而是跟随 AI 导师设计的 4 阶段学习路径:
+
+1. **先看门道** - 了解仓库定位、技术栈和整体架构
+2. **跑通主线** - 运行项目并追踪关键执行流程
+3. **拆它绝活** - 拆解值得学习的核心实现模式
+4. **抄走一招** - 提炼可复用的思路解决自己的问题
+
+### 💡 为什么选择 CodeGraph?
+
+优秀的仓库不是用来硬啃的,它们凝聚了多年的智慧、设计模式和久经考验的解决方案。**CodeGraph 让这些智慧变得触手可及**:
+
+- 🎯 **结构化混沌** - 将 10 万行代码转化为清晰的学习路线图
+- 🤖 **AI 导师指导** - 图增强 RAG 分析代码关系并提炼洞察
+- 🎮 **游戏化体验** - 像素风 + 进度追踪让学习更有趣
+- 📊 **可视化知识图谱** - Neo4j 驱动的依赖和概念关系映射
+- 🚀 **生产级模式** - 从真实项目中学习经过实战检验的代码
+
+---
+
+## 🎯 核心功能
+
+### 🗺️ **学习路径系统**
+将任何 GitHub 仓库转化为结构化的 4 阶段学习旅程。每个阶段专注于特定的学习目标,提供精选内容和引导式探索。
+
+### 🤖 **图增强 RAG**
+- **代码理解流水线**: 6-agent 系统 (类型/API/流程/模式/架构分析器 + 编排器)
+- **Neo4j 知识图谱**: 捕获函数依赖、调用层次和概念关系
+- **智能上下文组装**: 图遍历与向量相似度的混合检索
+
+### 🎨 **像素游戏界面**
+星露谷风格 UI,包含:
+- 交互式阶段卡片的旅程地图
+- 角色驱动的进度追踪
+- 资源驱动的像素艺术背景
+- 流畅的动画和悬停效果
+
+### 📊 **仓库分析**
+- 组件拆解的架构概览
+- 技术栈检测与可视化
+- 执行流程图
+- 核心模式提取
+
+---
+
+## 🚀 快速开始
 
 ### 环境要求
-- Python 3.11+
+
 - Node.js 18+
-- Docker & Docker Compose（用于本地起 Neo4j / Qdrant / Redis / PostgreSQL）
+- Python 3.11+
+- Docker & Docker Compose
+- Neo4j 实例 (或使用 Docker)
+- Claude API 密钥
 
-### 1. 克隆与配置
+### 安装步骤
 
+1. **克隆仓库**
 ```bash
-git clone https://github.com/liu66-qing/GitGraph.git
-cd GitGraph
-cp .env.example .env
-# 编辑 .env，填入你的密钥：
-#   LLM_API_KEY=<你的 DeepSeek key>
-#   EMBED_API_KEY=<你的 DashScope key>
+git clone https://github.com/liu66-qing/CodeGraph.git
+cd CodeGraph
 ```
 
-### 2. 起基础设施
-
+2. **配置环境变量**
 ```bash
-docker compose up -d   # Neo4j + Qdrant + Redis + PostgreSQL
+# 后端
+cp backend/.env.example backend/.env
+# 编辑 backend/.env 并添加你的 Claude API 密钥
 ```
 
-### 3. 装依赖并启动后端
-
+3. **启动基础设施**
 ```bash
-pip install -e ".[dev]"
-make run                # uvicorn，监听 :8080
-make worker             # 另开一个终端，跑 Celery 异步任务
+docker-compose up -d
 ```
 
-### 4. 启动前端
-
+4. **安装前端依赖**
 ```bash
-cd frontend && npm install && npm run dev
+cd frontend
+npm install
 ```
 
-打开 http://localhost:5173 。前端采用 **API 优先 + 优雅降级**：后端未连接时自动回退到"工具分析自身结构"的代码语义示例数据，演示永不空屏。
-
-### 5. 分析一个仓库
-
+5. **安装后端依赖**
 ```bash
-# 触发对一个本地 git 仓库的异步分析
-curl -X POST http://localhost:8080/api/v1/repositories \
-  -H "Content-Type: application/json" \
-  -d '{"repo_path": "/abs/path/to/some/repo", "repo_id": "demo"}'
-
-# 查看检测到的破坏性变更
-curl http://localhost:8080/api/v1/repositories/demo/breaking-changes
+cd backend
+pip install -r requirements.txt
 ```
 
-> 建议用一个干净的开源仓库（如 `requests`）做演示，效果最佳。
+6. **运行应用**
 
-
----
-
-<a name="api-参考"></a>
-## API 参考
-
-后端启动后，完整 Swagger 文档见 `http://localhost:8080/docs`。
-
-### 代码仓库分析（核心）
-
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| `POST` | `/api/v1/repositories` | 分析本地 git 仓库（异步），返回 `repo_id` |
-| `GET` | `/api/v1/repositories` | 列出已分析的仓库 |
-| `GET` | `/api/v1/repositories/{repo_id}/graph` | 代码图谱 nodes + edges（按 repo 过滤） |
-| `GET` | `/api/v1/repositories/{repo_id}/commits` | commit 时间线（含符号/文件计数、破坏性变更标记） |
-| `GET` | `/api/v1/repositories/{repo_id}/breaking-changes` | 检测到的破坏性变更 |
-| `GET` | `/api/v1/repositories/{repo_id}/stats` | 节点/关系/commit/破坏性变更计数 |
-
-### 图谱 / 问答 / 冲突
-
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| `POST` | `/api/v1/query` | 智能问答（含推理轨迹） |
-| `POST` | `/api/v1/query/stream` | SSE 流式问答 |
-| `GET` | `/api/v1/graph/entities` | 按名称搜索实体 |
-| `GET` | `/api/v1/graph/entities/{id}/neighborhood` | N 跳子图 |
-| `GET` | `/api/v1/conflicts` | 列出冲突（破坏性变更也走这里） |
-
-### Agent 代码工具
-
-通过 Function Calling 暴露给智能体的工具：
-
-| 工具 | 作用 |
-|------|------|
-| `find_callers` | 找出谁调用了某个符号 |
-| `find_dependencies` | 找出某个符号依赖什么 |
-| `get_symbol_history` | 追踪一个符号跨 commit 的演化 |
-| `find_breaking_changes` | 列出某个仓库的破坏性变更 |
-
----
-
-<a name="技术栈"></a>
-## 技术栈
-
-| 层 | 技术 | 用途 |
-|----|------|------|
-| **后端** | Python 3.11、FastAPI、Celery | 异步 API + 任务处理 |
-| **代码解析** | Python 内置 `ast` | 确定性代码图谱构建（零 LLM） |
-| **LLM** | DeepSeek（OpenAI 兼容） | Agent 推理、问答合成 |
-| **Embedding** | DashScope text-embedding-v3（1024 维） | 语义向量检索 |
-| **图数据库** | Neo4j 5.x | 代码图谱存储与遍历 |
-| **向量库** | Qdrant | 语义相似检索 |
-| **缓存/队列** | Redis 7 | 缓存、Celery broker、pub/sub |
-| **关系库** | PostgreSQL 16 | 元数据 |
-| **前端** | React 18、TypeScript、Vite | 用户界面 |
-| **可视化** | D3.js | 力导向代码图谱 |
-| **样式** | TailwindCSS | 响应式 UI |
-| **可观测性** | structlog、OpenTelemetry | 结构化日志与链路追踪 |
-
----
-
-## 项目结构
-
-```
-GitGraph/
-├── src/evograph/
-│   ├── ingestion/                   # 代码摄取
-│   │   ├── git_loader.py            # 逐 commit 遍历 + blob 缓存 + cat-file 批量读
-│   │   ├── code_parser.py           # ast 确定性解析器
-│   │   └── code_graph_adapter.py    # 跨文件符号解析 → 复用 merger 入图
-│   ├── evolution/                   # 演化分析
-│   │   ├── breaking_change_detector.py  # 破坏性变更检测（核心差异化）
-│   │   ├── code_repo_pipeline.py    # 串联 git→解析→入图→commit 链
-│   │   └── merger.py                # 图合并 / 版本化
-│   ├── agent/                       # Agentic RAG 核心
-│   │   ├── engine.py                # State Machine + Function Calling
-│   │   └── tools/registry.py        # 代码工具注册表
-│   ├── graph/                       # Neo4j 客户端与遍历
-│   ├── retrieval/                   # 混合检索（向量 + 图 + 关键词）
-│   ├── tasks/                       # Celery 异步任务
-│   ├── models/domain.py             # 实体/关系/冲突领域模型
-│   └── api/v1/                      # REST 端点
-│       └── repositories.py          # 代码仓库分析端点
-├── frontend/                        # React + D3.js 前端
-│   └── src/pages/
-│       ├── GraphExplorer.tsx        # 代码图谱浏览器
-│       ├── Timeline.tsx             # 演化时间线
-│       └── ConflictDashboard.tsx    # 破坏性变更看板
-├── tests/                           # 单元 / 集成测试
-├── docker-compose.yml               # Neo4j + Qdrant + Redis + PostgreSQL
-└── docs/                            # 文档与素材
+终端 1 (后端):
+```bash
+cd backend
+uvicorn main:app --reload --port 8000
 ```
 
----
+终端 2 (前端):
+```bash
+cd frontend
+npm run dev
+```
 
-## 设计取舍
-
-- **确定性解析 vs LLM 抽取**：代码结构用 `ast` 确定性解析——快、可复现、精确，不烧 token、不产生幻觉。LLM 只用在自然语言问答这一层。
-- **复用而非重写**：代码图谱复用文档管线已有的 `GraphMerger` / Neo4j 模型 / 冲突存储，破坏性变更直接落到既有的 `:Conflict` 通道，前端冲突看板与 API 无需另起炉灶。
-- **性能**：`git_loader` 用 `git cat-file --batch` 把"每文件一次 `git show`"压成"每 commit 一次批量读"，并按 `(blob_sha, path)` 缓存 `ParseResult`——未改动文件全程只解析一次，复杂度从 `O(commits × files)` 降到 `O(distinct file versions)`。
-
----
-
-## 贡献
-
-1. Fork 本仓库
-2. 新建特性分支（`git checkout -b feature/your-feature`）
-3. 跑测试（`make test`）
-4. 提交改动并发起 Pull Request
+访问 `http://localhost:5173` 开始探索仓库!
 
 ---
 
-## 许可证
+## 📖 使用方法
 
-本项目基于 Apache License 2.0 —— 详见 [LICENSE](LICENSE)。
+1. **粘贴 GitHub 仓库地址** (例如 `facebook/react`)
+2. **等待分析** - CodeGraph 将会:
+   - 克隆并解析仓库
+   - 构建依赖关系的知识图谱
+   - 生成语义搜索的嵌入向量
+   - 运行 6-agent 理解流水线
+3. **跟随学习路径**:
+   - 阶段 1: 建立全局认知
+   - 阶段 2: 追踪执行流程
+   - 阶段 3: 学习实现模式
+   - 阶段 4: 提炼可复用技巧
+4. **与代码库对话** - 在任何阶段提问
 
+---
 
+## 🎨 设计理念
 
+### 资源驱动的艺术方向
+CodeGraph 的像素风格基于授权资源包构建,而非 CSS 技巧:
+- **Ansimuz Sunny Land** - 彩色村庄场景
+- **Kenney 像素角色** - 导师精灵图
+- 自定义合成的英雄区和旅程地图背景
 
+### 游戏化学习
+- 带有 XP 和里程碑的进度追踪
+- 旅程地图上作为路标的阶段卡片
+- 完成阶段的视觉反馈
+- 导师角色全程指导
+
+### 图优先架构
+与纯 RAG 系统不同,CodeGraph:
+- **理解关系** - 函数调用、导入、继承
+- **保持结构** - 图遍历优先于向量搜索
+- **揭示连接** - 展示概念之间的关系,而非仅仅是定义
+
+---
+
+## 🤝 贡献
+
+我们欢迎贡献!请查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解指南。
+
+需要帮助的关键领域:
+- 📊 额外的仓库分析功能
+- 🎨 更多像素艺术资源和主题
+- 🌐 支持更多语言 (目前专注于 TypeScript/JavaScript)
+- 🧪 测试覆盖率改进
+- 📝 文档和教程
+
+---
+
+## 📄 许可证
+
+本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE)。
+
+---
+
+## 🙏 致谢
+
+- **资源包**: Ansimuz (Sunny Land)、Kenney (像素角色、体素包)
+- **灵感来源**: 星露谷的温馨游戏美学
+- **技术栈**: 基于 Anthropic Claude、LangChain、Neo4j 和现代 Web 技术栈构建
+
+---
+
+<div align="center">
+  Made with ❤️ by the CodeGraph team
+  
+  ⭐ Star us on GitHub if this project helped you!
+</div>
