@@ -8,6 +8,7 @@ import Showcase from './pages/Showcase'
 import Takeaway from './pages/Takeaway'
 import Evolution from './pages/Evolution'
 import LearningPathView from './pages/LearningPathView'
+import AgentTrace from './pages/AgentTrace'
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="/takeaway" element={<Takeaway />} />
         {/* Advanced */}
         <Route path="/evolution" element={<Evolution />} />
+        <Route path="/agent-trace" element={<AgentTrace />} />
       </Routes>
     </Layout>
   )

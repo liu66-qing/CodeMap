@@ -10,6 +10,7 @@ from codegraph.api.v1 import (
     repositories,
     analysis,
     learning,
+    agent_stats,
 )
 
 api_router = APIRouter()
@@ -24,5 +25,6 @@ v1_router.include_router(timeline.router, prefix="/timeline", tags=["timeline"])
 v1_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 v1_router.include_router(analysis.router, prefix="/analysis", tags=["analysis"])
 v1_router.include_router(learning.router, prefix="/learning", tags=["learning"])
+v1_router.include_router(agent_stats.router)
 
 api_router.include_router(v1_router)

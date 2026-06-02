@@ -23,6 +23,7 @@ import time
 import structlog
 
 from codegraph.llm.client import llm_client as default_llm_client
+from codegraph.agent.tools.stats import tool_stats_collector
 
 logger = structlog.get_logger()
 
@@ -143,6 +144,9 @@ class BaseAgent(ABC):
             raise
         finally:
             duration = (time.time() - start) * 1000
+            success = err is None
+
+            # Record in trace
             self.trace.tool_calls.append(
                 ToolCall(
                     tool_name=tool_name,
@@ -152,12 +156,21 @@ class BaseAgent(ABC):
                     error=err,
                 )
             )
+
+            # Record in global stats collector
+            tool_stats_collector.record_call(
+                tool_name=tool_name,
+                duration_ms=duration,
+                success=success,
+                agent_name=self.name,
+            )
+
             logger.info(
                 "tool_call",
                 agent=self.name,
                 tool=tool_name,
                 duration_ms=round(duration, 2),
-                ok=err is None,
+                ok=success,
             )
 
     async def call_llm(
