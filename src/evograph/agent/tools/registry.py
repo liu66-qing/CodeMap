@@ -29,6 +29,11 @@ class ToolRegistry:
             "find_dependencies": self._find_dependencies,
             "get_symbol_history": self._get_symbol_history,
             "find_breaking_changes": self._find_breaking_changes,
+            # === Code-understanding tools (architecture / impact / evolution) ===
+            "explain_architecture": self._explain_architecture,
+            "analyze_impact": self._analyze_impact,
+            "feature_evolution": self._feature_evolution,
+            "explain_symbol": self._explain_symbol,
         }
 
     def get_tool(self, name: str):
@@ -175,6 +180,112 @@ class ToolRegistry:
             """
             params = {}
         return await neo4j_client.execute_query(query, params)
+
+    # === Code-understanding tools ===
+
+    async def _explain_architecture(self, repo_id: str = "", **kwargs) -> dict:
+        """'What does this system look like?' — layers, patterns, boundaries.
+
+        Reads the persisted RepoAnalysis if present, else computes on-demand from
+        the graph. Answers 'what is this module/system' questions with grounding.
+        """
+        if not repo_id:
+            return {"error": "repo_id required"}
+        from evograph.agent.analyzers.graph_view import CodeGraphView
+        from evograph.agent.analyzers.architecture_analyzer import analyze_architecture
+        # Prefer the persisted summary.
+        rows = await neo4j_client.execute_query(
+            "MATCH (a:RepoAnalysis {repo_id: $repo_id}) RETURN a.architecture AS architecture",
+            {"repo_id": repo_id},
+        )
+        if rows and rows[0].get("architecture"):
+            import json
+            return json.loads(rows[0]["architecture"])
+        view = await CodeGraphView.from_neo4j(repo_id)
+        return await analyze_architecture(view)
+
+    async def _analyze_impact(self, symbol: str = "", repo_id: str = "", **kwargs) -> dict:
+        """'If I change this function, what breaks?' — transitive caller closure.
+
+        Walks reverse CALLS edges outward from `symbol` to find every symbol that
+        (transitively) depends on it, plus any breaking-change history. This is the
+        core 'change impact' question for a code-understanding agent.
+        """
+        if not symbol:
+            return {"error": "symbol required"}
+        scope = "AND n.repo_id = $repo_id" if repo_id else ""
+        rows = await neo4j_client.execute_query(
+            f"""
+            MATCH (target:Entity)
+            WHERE target.name = $symbol OR target.name ENDS WITH '.' + $symbol
+            CALL {{
+                WITH target
+                MATCH (n:Entity)-[r:RELATION*1..6]->(target)
+                WHERE all(rel IN r WHERE rel.type = 'CALLS' AND rel.is_active = true)
+                  {scope}
+                RETURN DISTINCT n.name AS dependent, length(r) AS distance
+            }}
+            RETURN dependent, min(distance) AS distance
+            ORDER BY distance ASC
+            LIMIT 200
+            """,
+            {"symbol": symbol, "repo_id": repo_id} if repo_id else {"symbol": symbol},
+        )
+        history = await self._get_symbol_history(symbol=symbol)
+        return {
+            "symbol": symbol,
+            "impacted": rows,
+            "impacted_count": len(rows),
+            "breaking_change_history": history,
+        }
+
+    async def _feature_evolution(self, symbol: str = "", repo_id: str = "", **kwargs) -> dict:
+        """'When did this start / how did it evolve?' — the commit where a symbol
+        first appears and the breaking changes it accumulated since.
+
+        Combines first-appearance (earliest commit touching its file or the
+        earliest breaking-change record) with the ordered change history.
+        """
+        if not symbol:
+            return {"error": "symbol required"}
+        history = await self._get_symbol_history(symbol=symbol)
+        # Earliest commit that references this symbol's qualified name as a conflict
+        # anchor, else fall back to the repo's first commit overall.
+        first = await neo4j_client.execute_query(
+            """
+            MATCH (cm:Commit)
+            WHERE ($repo_id = '' OR cm.repo_id = $repo_id)
+            RETURN cm.short_sha AS commit, cm.subject AS subject, cm.timestamp AS timestamp
+            ORDER BY cm.timestamp ASC
+            LIMIT 1
+            """,
+            {"repo_id": repo_id},
+        )
+        return {
+            "symbol": symbol,
+            "first_commit": first[0] if first else None,
+            "evolution": history,
+            "change_count": len(history),
+        }
+
+    async def _explain_symbol(
+        self, symbol: str = "", repo_id: str = "", persona: str = "junior", **kwargs
+    ) -> dict:
+        """'What does this symbol do?' — a plain-language, persona-tuned summary."""
+        if not symbol or not repo_id:
+            return {"error": "symbol and repo_id required"}
+        from evograph.agent.analyzers.symbol_explainer import explain_symbol
+        # Pull architecture for layer context if persisted.
+        architecture = None
+        rows = await neo4j_client.execute_query(
+            "MATCH (a:RepoAnalysis {repo_id: $r}) RETURN a.architecture AS arch",
+            {"r": repo_id},
+        )
+        if rows and rows[0].get("arch"):
+            import json
+            architecture = json.loads(rows[0]["arch"])
+        result = await explain_symbol(repo_id, symbol, persona=persona, architecture=architecture)
+        return result or {"error": "symbol not found"}
 
 
 tool_registry = ToolRegistry()

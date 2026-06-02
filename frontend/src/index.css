@@ -988,7 +988,7 @@ input {
 
 .cg-node-num {
   position: absolute;
-  top: 12px;
+  top: -16px;
   left: 50%;
   display: grid;
   place-items: center;
@@ -1195,7 +1195,7 @@ input {
   .cg-search-decor { opacity: 0.82; transform: scale(0.82); }
   .cg-search-decor-left { left: max(0px, calc(50% - 560px)); }
   .cg-search-decor-right { right: max(0px, calc(50% - 565px)); }
-  .cg-journey-node { width: clamp(126px, 14%, 160px); padding: 12px 10px 9px; }
+  .cg-journey-node { width: clamp(126px, 14%, 160px); padding: 16px 10px 9px; }
   .cg-journey-node strong { font-size: 13px; }
   .cg-journey-node small { font-size: 10px; }
 }
@@ -1216,7 +1216,7 @@ input {
   .cg-repo-input .mantine-Input-input,
   .cg-start-button { height: 56px !important; }
   .cg-journey-map { height: 230px; margin-top: 16px; border-radius: 12px; }
-  .cg-journey-node { width: 120px; padding: 6px 8px; }
+  .cg-journey-node { width: 120px; padding: 16px 8px 8px; }
   .cg-reward-grid { grid-template-columns: repeat(2, 1fr); }
   .cg-current-stage { grid-template-columns: 1fr; }
 }
