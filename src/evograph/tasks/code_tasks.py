@@ -11,14 +11,18 @@ logger = structlog.get_logger()
 
 
 @celery_app.task(bind=True, name="evograph.analyze_repository")
-def analyze_repository_task(self, repo_id: str, repo_path: str, max_commits: int | None = None):
-    """Walk a git repo's history, build its code graph, and detect breaking changes."""
+def analyze_repository_task(self, repo_id: str, repo_path: str, max_commits: int | None = None,
+                            entry_point: str | None = None):
+    """Walk a git repo's history, build its code graph, detect breaking changes,
+    and run the code-understanding agents (architecture / tour / review)."""
     self.update_state(state="PROCESSING", meta={"stage": "walking_history"})
 
     loop = asyncio.new_event_loop()
     try:
         result = loop.run_until_complete(
-            code_repo_pipeline.process_repository(repo_id, repo_path, max_commits=max_commits)
+            code_repo_pipeline.process_repository(
+                repo_id, repo_path, max_commits=max_commits, entry_point=entry_point
+            )
         )
         return result
     except Exception as e:

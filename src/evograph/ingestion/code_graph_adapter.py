@@ -147,6 +147,8 @@ def build_extraction_from_parses(
                 "code_kind": n.kind,      # module|class|function|method
                 "signature": n.signature,
                 "file_path": n.file_path,
+                "line_start": n.line_start,
+                "line_end": n.line_end,
             },
         )
         for n in all_nodes

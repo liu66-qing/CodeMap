@@ -119,6 +119,8 @@ class GraphMerger:
                 code_kind: $code_kind,
                 signature: $signature,
                 file_path: $file_path,
+                line_start: $line_start,
+                line_end: $line_end,
                 first_seen: datetime(),
                 last_updated: datetime()
             })
@@ -133,6 +135,8 @@ class GraphMerger:
                 "code_kind": meta.get("code_kind"),
                 "signature": meta.get("signature"),
                 "file_path": meta.get("file_path"),
+                "line_start": meta.get("line_start"),
+                "line_end": meta.get("line_end"),
             },
         )
         return entity_id

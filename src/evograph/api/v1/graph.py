@@ -17,9 +17,27 @@ router = APIRouter()
 async def search_entities(
     q: str = Query("", description="Search query"),
     entity_type: EntityType | None = None,
+    repo_id: str | None = Query(None, description="Scope search to one repo's code symbols"),
     skip: int = 0,
     limit: int = 20,
 ) -> list[dict]:
+    if repo_id:
+        # Code-symbol search within a repo: match qualified name OR simple name.
+        from evograph.graph.neo4j_client import neo4j_client
+        try:
+            return await neo4j_client.execute_query(
+                """
+                MATCH (e:Entity {repo_id: $repo_id})
+                WHERE $q = '' OR toLower(e.name) CONTAINS toLower($q)
+                RETURN e.id AS id, e.name AS name, e.code_kind AS kind,
+                       e.signature AS signature, e.file_path AS file_path
+                ORDER BY size(e.name) ASC
+                SKIP $skip LIMIT $limit
+                """,
+                {"repo_id": repo_id, "q": q, "skip": skip, "limit": limit},
+            )
+        except Exception:
+            return []
     if q:
         results = await traversal.get_entity_by_name(q)
         return results

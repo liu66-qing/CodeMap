@@ -17,11 +17,74 @@ Implementation notes:
 
 from __future__ import annotations
 
+import os
+import re
+import shutil
 import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from evograph.ingestion.code_parser import parse_python_source, ParseResult
+
+
+# Where cloned remote repos are cached, so re-analysis doesn't re-download.
+CLONE_CACHE_DIR = os.path.join(".cache", "repos")
+
+_GITHUB_URL_RE = re.compile(
+    r"^(https?://|git@)([\w.@:/\-~]+?)(\.git)?/?$", re.IGNORECASE
+)
+
+
+def _slug_for_url(url: str) -> str:
+    """Stable, filesystem-safe directory name derived from a clone URL.
+
+    github.com/datawhalechina/hello-agents -> datawhalechina__hello-agents
+    """
+    m = _GITHUB_URL_RE.match(url.strip())
+    body = m.group(2) if m else url
+    body = body.replace("git@", "").replace(":", "/")
+    parts = [p for p in re.split(r"[/]", body) if p and p not in ("github.com", "gitlab.com", "www")]
+    slug = "__".join(parts[-2:]) if len(parts) >= 2 else (parts[-1] if parts else "repo")
+    return re.sub(r"[^\w.\-]", "_", slug)
+
+
+def is_remote_url(s: str) -> bool:
+    """True if `s` looks like a clonable git URL rather than a local path."""
+    return bool(_GITHUB_URL_RE.match(s.strip())) and not os.path.isdir(s)
+
+
+def clone_repo(url: str, dest_root: str = CLONE_CACHE_DIR, refresh: bool = False) -> str:
+    """Clone (or reuse a cached clone of) a remote git repo. Returns the local path.
+
+    Full history is fetched because the evolution layer needs it. If the cache
+    already has the repo we `git fetch` to update it unless that fails (offline),
+    in which case we use what's on disk. Raises GitHistoryError on a fresh clone
+    failure so the caller can surface a clear message.
+    """
+    os.makedirs(dest_root, exist_ok=True)
+    dest = os.path.join(dest_root, _slug_for_url(url))
+
+    if os.path.isdir(os.path.join(dest, ".git")):
+        if refresh:
+            try:
+                _run_git(dest, ["fetch", "--all", "--quiet"])
+            except GitHistoryError:
+                pass  # offline / transient — fall back to cached state
+        return dest
+
+    if os.path.isdir(dest):
+        shutil.rmtree(dest, ignore_errors=True)
+    try:
+        subprocess.run(
+            ["git", "clone", "--quiet", url, dest],
+            capture_output=True, check=True,
+        )
+    except FileNotFoundError as exc:
+        raise GitHistoryError("git executable not found on PATH") from exc
+    except subprocess.CalledProcessError as exc:
+        stderr = exc.stderr.decode("utf-8", "replace") if exc.stderr else ""
+        raise GitHistoryError(f"git clone failed: {stderr.strip()}") from exc
+    return dest
 
 
 @dataclass
@@ -62,14 +125,23 @@ def _run_git(repo_path: str, args: list[str], binary: bool = False) -> str | byt
     return proc.stdout if binary else proc.stdout.decode("utf-8", "replace")
 
 
-def list_commits(repo_path: str, max_commits: int | None = None, branch: str = "HEAD") -> list[CommitInfo]:
+def list_commits(repo_path: str, max_commits: int | None = None, branch: str = "HEAD",
+                 path_prefix: str = "") -> list[CommitInfo]:
     """Return commits oldest-first (chronological), so replaying them models
-    forward evolution through time."""
+    forward evolution through time.
+
+    When `path_prefix` is set, only commits that touched that subtree are
+    returned, and each commit's `parent_sha` is re-chained to the previous
+    subtree-touching commit — so the breaking-change detector diffs adjacent
+    revisions of the sub-app, not arbitrary monorepo-wide neighbors.
+    """
     # Unit-separated fields, record-separated rows, to survive odd commit text.
     fmt = "%H%x1f%h%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%P"
     args = ["log", f"--pretty=format:{fmt}", branch]
-    if max_commits:
+    if max_commits and not path_prefix:
         args.insert(1, f"-n{max_commits}")
+    if path_prefix:
+        args += ["--", path_prefix]
     out = _run_git(repo_path, args)
     commits: list[CommitInfo] = []
     for line in out.splitlines():
@@ -90,20 +162,34 @@ def list_commits(repo_path: str, max_commits: int | None = None, branch: str = "
                        timestamp=ts, subject=subject, parent_sha=first_parent)
         )
     commits.reverse()  # oldest first
-    if max_commits:
+    if path_prefix:
+        # Re-chain: each commit's parent is the previous subtree-touching commit.
+        for i, c in enumerate(commits):
+            c.parent_sha = commits[i - 1].sha if i > 0 else ""
+        if max_commits:
+            commits = commits[-max_commits:]
+            if commits:
+                commits[0].parent_sha = ""  # the new oldest has no in-window parent
+    elif max_commits:
         commits = commits[-max_commits:]
     return commits
 
 
-def _list_py_blobs_at(repo_path: str, rev: str) -> list[tuple[str, str]]:
+def _list_py_blobs_at(repo_path: str, rev: str, path_prefix: str = "") -> list[tuple[str, str]]:
     """Return (blob_sha, path) for every .py file tracked at a given revision.
 
     The blob SHA is git's content hash: two files (across commits or paths) with
     identical bytes share a blob SHA. That identity is what lets us parse each
     distinct file content exactly once instead of once per commit.
+
+    `path_prefix` (e.g. "code/chapter13/helloagents-trip-planner/") scopes the
+    listing to a subtree — used to analyze one sub-app inside a monorepo.
     """
     # Without --name-only, ls-tree emits: "<mode> <type> <sha>\t<path>".
-    out = _run_git(repo_path, ["ls-tree", "-r", rev])
+    args = ["ls-tree", "-r", rev]
+    if path_prefix:
+        args.append(path_prefix)
+    out = _run_git(repo_path, args)
     blobs: list[tuple[str, str]] = []
     for line in out.splitlines():
         if "\t" not in line:
@@ -221,6 +307,7 @@ def load_commit_snapshot(
     src_prefixes: tuple[str, ...] = ("src/", "lib/"),
     max_files: int | None = None,
     parse_cache: dict[tuple[str, str], ParseResult] | None = None,
+    path_prefix: str = "",
 ) -> CommitSnapshot:
     """Parse every .py file as it existed at `commit`.
 
@@ -235,13 +322,17 @@ def load_commit_snapshot(
     sharing one object across snapshots is safe.
     """
     cache = parse_cache if parse_cache is not None else {}
-    blobs = _list_py_blobs_at(repo_path, commit.sha)
+    blobs = _list_py_blobs_at(repo_path, commit.sha, path_prefix=path_prefix)
     if max_files:
         blobs = blobs[:max_files]
 
     # Only fetch blobs whose (sha, path) we haven't parsed yet.
     missing = sorted({sha for sha, path in blobs if (sha, path) not in cache})
     contents = _batch_read_blobs(repo_path, missing)
+
+    # When scoped to a subtree, strip that prefix too so module names are clean
+    # (e.g. "code/.../backend/app/api/main" -> "app.api.main").
+    effective_prefixes = ((path_prefix,) + src_prefixes) if path_prefix else src_prefixes
 
     parses: list[ParseResult] = []
     for sha, path in blobs:
@@ -252,7 +343,7 @@ def load_commit_snapshot(
         source = contents.get(sha)
         if source is None:
             continue
-        module = _module_name(path, src_prefixes)
+        module = _module_name(path, effective_prefixes)
         result = parse_python_source(source, module, path)
         cache[(sha, path)] = result
         parses.append(result)
@@ -267,20 +358,32 @@ def iter_history(
     branch: str = "HEAD",
     src_prefixes: tuple[str, ...] = ("src/", "lib/"),
     max_files: int | None = None,
+    path_prefix: str = "",
 ):
     """Yield CommitSnapshot for each commit, oldest first.
 
     A single (blob, path)->ParseResult cache is shared across the whole walk, so
     files that don't change between commits are parsed only once. This turns the
     cost from O(commits × files) down to O(distinct file versions).
+
+    `path_prefix` scopes the walk to a subtree (one sub-app inside a monorepo);
+    commits that don't touch that subtree still yield, but with no parses.
     """
     parse_cache: dict[tuple[str, str], ParseResult] = {}
-    for commit in list_commits(repo_path, max_commits=max_commits, branch=branch):
+    for commit in list_commits(repo_path, max_commits=max_commits, branch=branch,
+                               path_prefix=path_prefix):
         yield load_commit_snapshot(
             repo_path,
             commit,
             src_prefixes=src_prefixes,
             max_files=max_files,
             parse_cache=parse_cache,
+            path_prefix=path_prefix,
         )
+
+
+def _resolve_branch(repo_path: str, branch: str, path_prefix: str) -> str:
+    """Deprecated no-op kept for backward compatibility; pathspec filtering now
+    happens directly in list_commits via `path_prefix`."""
+    return branch
 

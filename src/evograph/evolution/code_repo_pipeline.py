@@ -11,12 +11,23 @@ Flow:
     3. Across ALL consecutive snapshots, detect breaking changes and persist
        them as :Conflict nodes (reusing the conflict store shape), each linked
        to the commit that introduced it.
+    4. Run the code-UNDERSTANDING agents over the current graph (distilled from
+       the Understand-Anything multi-agent design):
+         4a. architecture_analyzer -> layers / patterns / module boundaries
+         4b. tour_builder          -> an ordered, narrated walk from an entry point
+         4c. graph_reviewer        -> cross-checks 4a/4b, corrects, scores confidence
+    5. Persist the architecture summary + tour + review onto a :RepoAnalysis node
+       in Neo4j and (best-effort) cache them in Redis, so the frontend can read
+       comprehension results without re-running the agents.
 
 The current-state graph powers "what calls this / what does this depend on",
-and the breaking-change history powers "which commit broke this contract".
+the breaking-change history powers "which commit broke this contract", and the
+understanding layer powers "what is this system and how does a request flow".
 """
 
 from __future__ import annotations
+
+import json
 
 import structlog
 
@@ -25,6 +36,11 @@ from evograph.ingestion.code_graph_adapter import build_extraction_from_parses
 from evograph.evolution.breaking_change_detector import scan_history, BreakingChange
 from evograph.evolution.merger import graph_merger
 from evograph.graph.neo4j_client import neo4j_client
+from evograph.agent.analyzers.graph_view import CodeGraphView
+from evograph.agent.analyzers.architecture_analyzer import analyze_architecture
+from evograph.agent.analyzers.tour_builder import build_tour
+from evograph.agent.analyzers.graph_reviewer import review_graph
+from evograph.agent.analyzers.learning_path import build_learning_path_annotated
 
 logger = structlog.get_logger()
 
@@ -36,12 +52,17 @@ class CodeRepoPipeline:
         repo_path: str,
         max_commits: int | None = None,
         src_prefixes: tuple[str, ...] = ("src/", "lib/"),
+        entry_point: str | None = None,
+        run_understanding: bool = True,
+        path_prefix: str = "",
     ) -> dict:
-        logger.info("code_pipeline_start", repo_id=repo_id, repo_path=repo_path)
+        logger.info("code_pipeline_start", repo_id=repo_id, repo_path=repo_path,
+                    path_prefix=path_prefix)
 
         # Stage 1: walk full history once, materialize snapshots.
         snapshots: list[CommitSnapshot] = list(
-            iter_history(repo_path, max_commits=max_commits, src_prefixes=src_prefixes)
+            iter_history(repo_path, max_commits=max_commits, src_prefixes=src_prefixes,
+                         path_prefix=path_prefix)
         )
         if not snapshots:
             return {"repo_id": repo_id, "error": "no commits found", "commits": 0}
@@ -71,6 +92,17 @@ class CodeRepoPipeline:
         # ones with breaking changes) so the Timeline can replay evolution.
         await self._store_commit_history(repo_id, snapshots)
 
+        # Persist where this repo lives on disk + which subtree, so the source
+        # reader can fetch real code bodies later (mechanism analysis, viewer).
+        await self._store_repo_location(repo_id, repo_path, path_prefix, latest.commit.sha)
+
+        # Stages 4a-6: code-understanding agents over the current graph.
+        # Built straight from the in-memory extraction — no Neo4j round-trip —
+        # so understanding still works even if the merge above degraded.
+        understanding: dict = {}
+        if run_understanding:
+            understanding = await self._run_understanding(repo_id, extraction, entry_point)
+
         result = {
             "repo_id": repo_id,
             "commits": len(snapshots),
@@ -79,9 +111,48 @@ class CodeRepoPipeline:
             "relations_merged": merge_stats.get("relations_created", 0),
             "breaking_changes": len(breaking),
             "adapter_stats": adapter_stats,
+            "understanding": understanding,
         }
-        logger.info("code_pipeline_complete", **{k: v for k, v in result.items() if k != "adapter_stats"})
+        logger.info("code_pipeline_complete", **{
+            k: v for k, v in result.items() if k not in ("adapter_stats", "understanding")
+        })
         return result
+
+    async def _run_understanding(
+        self, repo_id: str, extraction, entry_point: str | None
+    ) -> dict:
+        """Run architecture -> tour -> review, then persist (Stage 7).
+
+        Best-effort: any failure is logged and the rest of the pipeline result is
+        still returned. Comprehension is additive, never a hard dependency.
+        """
+        try:
+            view = CodeGraphView.from_extraction(extraction, repo_id=repo_id)
+            architecture = await analyze_architecture(view)               # 4a
+            tour = await build_tour(view, entry_point=entry_point)         # 4b
+            learning = await build_learning_path_annotated(view, architecture)  # 4c
+            architecture, review = await review_graph(view, architecture, tour)  # 6 (corrects 4a)
+            await self._store_understanding(repo_id, architecture, tour, review, learning)  # 7
+            logger.info(
+                "understanding_complete",
+                repo_id=repo_id,
+                layers=len(architecture.get("layers", [])),
+                tour_steps=len(tour.get("steps", [])),
+                learning_steps=len(learning.get("steps", [])),
+                review_confidence=review.get("confidence"),
+            )
+            return {
+                "architecture_generated_by": architecture.get("generated_by"),
+                "layers": len(architecture.get("layers", [])),
+                "patterns": len(architecture.get("patterns", [])),
+                "tour_steps": len(tour.get("steps", [])),
+                "learning_steps": len(learning.get("steps", [])),
+                "review_confidence": review.get("confidence"),
+                "review_issues": len(review.get("issues", [])),
+            }
+        except Exception as exc:
+            logger.warning("understanding_failed", repo_id=repo_id, error=str(exc))
+            return {"error": str(exc)}
 
     async def _store_breaking_changes(
         self, repo_id: str, changes: list[BreakingChange]
@@ -193,6 +264,88 @@ class CodeRepoPipeline:
                     {"sha": c.sha, "parent": c.parent_sha, "repo_id": repo_id},
                 )
         logger.info("commit_history_stored", repo_id=repo_id, commits=len(snapshots))
+
+    async def _store_repo_location(
+        self, repo_id: str, repo_path: str, path_prefix: str, head_sha: str
+    ) -> None:
+        """Persist the repo's on-disk clone path + analyzed subtree + HEAD sha on a
+        :Repo node, so the source reader can fetch real code bodies for any symbol.
+
+        Best-effort: a failure here only disables source-code features, not the
+        rest of the pipeline.
+        """
+        try:
+            import os
+            await neo4j_client.execute_write(
+                """
+                MERGE (r:Repo {repo_id: $repo_id})
+                  SET r.local_path = $local_path,
+                      r.path_prefix = $path_prefix,
+                      r.head_sha = $head_sha,
+                      r.updated_at = datetime()
+                """,
+                {
+                    "repo_id": repo_id,
+                    "local_path": os.path.abspath(repo_path),
+                    "path_prefix": path_prefix or "",
+                    "head_sha": head_sha,
+                },
+            )
+        except Exception as exc:
+            logger.warning("store_repo_location_failed", repo_id=repo_id, error=str(exc))
+
+    async def _store_understanding(
+        self, repo_id: str, architecture: dict, tour: dict, review: dict,
+        learning: dict | None = None,
+    ) -> None:
+        """Stage 7: persist comprehension results so the frontend can read them
+        without re-running the agents.
+
+        Stored two ways, both best-effort:
+          - Neo4j  : one :RepoAnalysis node keyed by repo_id, payloads JSON-encoded
+                     (Neo4j can't store nested maps as properties, so we serialize).
+          - Redis  : a cache entry for fast reads, TTL 24h.
+        The two are independent — if Neo4j is down, Redis still serves the API,
+        and vice-versa.
+        """
+        learning = learning or {"steps": []}
+        arch_json = json.dumps(architecture, ensure_ascii=False, default=str)
+        tour_json = json.dumps(tour, ensure_ascii=False, default=str)
+        review_json = json.dumps(review, ensure_ascii=False, default=str)
+        learning_json = json.dumps(learning, ensure_ascii=False, default=str)
+
+        try:
+            await neo4j_client.execute_write(
+                """
+                MERGE (a:RepoAnalysis {repo_id: $repo_id})
+                  SET a.architecture = $architecture,
+                      a.tour = $tour,
+                      a.review = $review,
+                      a.learning_path = $learning,
+                      a.review_confidence = $confidence,
+                      a.architecture_generated_by = $arch_by,
+                      a.updated_at = datetime()
+                """,
+                {
+                    "repo_id": repo_id,
+                    "architecture": arch_json,
+                    "tour": tour_json,
+                    "review": review_json,
+                    "learning": learning_json,
+                    "confidence": review.get("confidence"),
+                    "arch_by": architecture.get("generated_by"),
+                },
+            )
+        except Exception as exc:
+            logger.warning("store_understanding_neo4j_failed", repo_id=repo_id, error=str(exc))
+
+        try:
+            from evograph.storage.redis_cache import redis_client
+            payload = {"architecture": architecture, "tour": tour, "review": review,
+                       "learning_path": learning}
+            await redis_client.set(f"repo_analysis:{repo_id}", payload, ttl=86400)
+        except Exception as exc:
+            logger.warning("store_understanding_redis_failed", repo_id=repo_id, error=str(exc))
 
 
 code_repo_pipeline = CodeRepoPipeline()
