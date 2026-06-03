@@ -1,9 +1,9 @@
 # CodeGraph
 
 <div align="center">
-  <img src="./docs/assets/github标题背景图.png" alt="CodeGraph - 把复杂仓库变成学习地图" width="100%">
+  <img src="./docs/assets/github标题背景图.png" alt="CodeGraph - 代码仓库理解 Agent" width="100%">
 
-  <h3>别再硬啃大仓库了。把 GitHub 项目变成一张能跟着走的源码学习地图。</h3>
+  <h3>一个面向 GitHub 仓库理解的 Agentic RAG 项目：会规划、会检索、会拆解、会生成源码学习地图。</h3>
 
   <p>
     <a href="./README.md">English</a> ·
@@ -13,9 +13,9 @@
   </p>
 
   <p>
-    <img src="https://img.shields.io/badge/场景-源码学习-111827?style=flat-square" alt="源码学习">
-    <img src="https://img.shields.io/badge/路线-四阶段学习地图-f59e0b?style=flat-square" alt="四阶段学习地图">
-    <img src="https://img.shields.io/badge/RAG-图增强检索-7c3aed?style=flat-square" alt="图增强检索">
+    <img src="https://img.shields.io/badge/Agent-代码仓库理解-111827?style=flat-square" alt="代码仓库理解 Agent">
+    <img src="https://img.shields.io/badge/Workflow-多阶段任务编排-f59e0b?style=flat-square" alt="多阶段任务编排">
+    <img src="https://img.shields.io/badge/RAG-图增强召回-7c3aed?style=flat-square" alt="图增强召回">
     <img src="https://img.shields.io/badge/前端-React%20%2B%20Vite-61dafb?style=flat-square" alt="React + Vite">
     <img src="https://img.shields.io/badge/后端-FastAPI-009688?style=flat-square" alt="FastAPI">
     <img src="https://img.shields.io/badge/License-Apache--2.0-blue?style=flat-square" alt="Apache 2.0">
@@ -42,17 +42,17 @@ README 告诉你怎么安装、怎么用，但没人告诉你：
 - 看了很多源码解析文章，但换个项目又迷路。
 - 问 AI 一堆问题，答案看似有用，最后还是缺一张全局地图。
 
-**CodeGraph 想解决的就是这个痛点：把复杂 GitHub 仓库变成一条可视化、分阶段、能推进的源码学习路线。**
+**CodeGraph 想解决的就是这个痛点：用 Agent 编排和图增强检索，把复杂 GitHub 仓库拆成可追踪、可解释、可继续推进的结构化理解结果。**
 
 如果你也觉得“读懂优秀项目”这件事应该变得更简单，欢迎给这个仓库点个 Star。Star 是我继续把它做下去的最大动力。
 
 ## CodeGraph 是什么？
 
-CodeGraph 是一个面向源码学习的 AI 代码理解平台。
+CodeGraph 是一个面向代码仓库理解的 Agentic RAG 项目。
 
-它不是单纯的“代码问答机器人”，而是先帮你建立项目地图，再带你按阶段理解：
+它不是单纯的“代码问答机器人”，也不只是一个可视化页面。它的核心是让多个阶段化 Agent 围绕同一个仓库协作分析：先建立全局结构，再追踪主流程，再提炼实现亮点，最后生成可复用的学习结论。
 
-| 阶段 | 解决的问题 | 你会得到什么 |
+| Agent 阶段 | 解决的问题 | 你会得到什么 |
 | --- | --- | --- |
 | **1. 先看门道** | 这个项目到底是干什么的？结构怎么分？ | 项目定位、技术栈、目录结构、核心模块 |
 | **2. 跑通主线** | 项目的主流程怎么跑起来？ | 入口文件、调用链、关键逻辑、执行路径 |
@@ -61,14 +61,14 @@ CodeGraph 是一个面向源码学习的 AI 代码理解平台。
 
 一句话：
 
-> CodeGraph 不是帮你“搜答案”，而是帮你“读懂一个仓库”。
+> CodeGraph 不是帮你“搜答案”，而是让 Agent 替你完成一次有结构的仓库理解流程。
 
 ## 在线体验
 
 - [在线 Demo](https://code-graph-five.vercel.app/)
 - [学习地图页](https://code-graph-five.vercel.app/map)
 
-说明：当前在线 Demo 主要展示前端体验和产品形态；完整仓库分析、AI 问答、图谱检索能力需要在本地启动后端服务。
+说明：当前在线 Demo 主要展示产品交互层；完整 Agent 工作流、图增强召回、仓库分析和结构化输出需要在本地启动后端服务。
 
 ## 效果预览
 
@@ -123,12 +123,13 @@ CodeGraph 是一个面向源码学习的 AI 代码理解平台。
 
 源码不是普通文本。源码有入口、模块、依赖、调用链、测试、抽象边界。
 
-CodeGraph 更关注这些结构：
+CodeGraph 更像一个围绕代码结构工作的 Agent 系统：
 
 - **图增强检索**：不只看语义相似，还看代码实体之间的关系。
-- **阶段化 Agent**：总览、主线、亮点、迁移建议分别处理。
-- **学习优先**：输出目标不是炫技，而是让人能继续往下读。
-- **可视化路线**：把仓库变成一张地图，而不是一堵文件墙。
+- **阶段化 Agent**：总览、主线、亮点、迁移建议分别由不同阶段承接。
+- **工具化分析链路**：代码读取、结构解析、检索、推理和输出拆成可组合步骤。
+- **结构化输出**：不是生成一段泛泛解释，而是输出地图、流程、亮点和可迁移结论。
+- **可视化 Agent UI**：学习地图是 Agent 分析结果的展示界面，不是项目的全部。
 
 ## 架构概览
 
@@ -139,15 +140,16 @@ flowchart LR
   B --> D["代码关系图谱"]
   C --> E["混合检索"]
   D --> E
-  E --> F["阶段化 Agent"]
-  F --> G["先看门道"]
-  F --> H["跑通主线"]
-  F --> I["拆它绝活"]
-  F --> J["抄走一招"]
-  G --> K["可视化学习地图"]
+  E --> F["Agent 编排器"]
+  F --> G["先看门道 Agent"]
+  F --> H["跑通主线 Agent"]
+  F --> I["拆它绝活 Agent"]
+  F --> J["抄走一招 Agent"]
+  G --> K["结构化 Agent 输出"]
   H --> K
   I --> K
   J --> K
+  K --> L["可视化学习地图"]
 ```
 
 ## 技术栈
@@ -158,7 +160,7 @@ flowchart LR
 | 后端 | FastAPI、Python 3.11 |
 | 检索 | 向量检索、关键词检索、混合召回 |
 | 图谱 | 面向代码关系的图结构建模 |
-| Agent | 四阶段分析 Agent、任务编排、结构化输出 |
+| Agent | Agent 编排器、阶段化分析 Agent、工具调用、结构化输出 |
 | 部署 | Docker Compose、本地后端、Vercel 前端 |
 
 ## 快速开始
@@ -212,7 +214,7 @@ npm run dev
 
 - 想读懂优秀开源项目，但经常卡在文件树里的开发者
 - 想为团队新人做项目 onboarding 的技术负责人
-- 想做 Code Agent / RAG Agent / 图谱检索项目的同学
+- 想做 Code Agent / Agentic RAG / 图谱检索项目的同学
 - 想给开源项目提 PR，但不知道从哪里理解代码的人
 - 想研究 Agentic RAG 在代码理解场景中怎么落地的人
 
@@ -233,7 +235,7 @@ npm run dev
 
 - 给仓库点 Star，让更多人看到这个项目。
 - 提 Issue：告诉我你最想分析哪个仓库。
-- 提建议：你希望“源码学习地图”长什么样。
+- 提建议：你希望“代码仓库理解 Agent”应该具备什么能力。
 - 提 PR：增加新的语言解析、新的分析器、新的页面或文档。
 
 适合作为 Issue 的想法：
