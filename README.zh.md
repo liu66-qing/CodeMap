@@ -14,7 +14,7 @@
   </p>
 
   <p>
-    <a href="./README.md">English</a> · <a href="./README.zh.md">中文</a>
+    <a href="./README.md">English</a> · <a href="./README.zh.md">中文</a> · <a href="https://code-graph-five.vercel.app/" target="_blank">在线 Demo</a>
   </p>
 </div>
 

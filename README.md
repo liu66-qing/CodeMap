@@ -14,7 +14,7 @@
   </p>
 
   <p>
-    <a href="./README.md">English</a> · <a href="./README.zh.md">中文</a>
+    <a href="./README.md">English</a> · <a href="./README.zh.md">中文</a> · <a href="https://code-graph-five.vercel.app/" target="_blank">Live Demo</a>
   </p>
 </div>
 
@@ -51,6 +51,8 @@ CodeGraph breaks complex repos into 4 game-like stages you complete in order:
 | **④ Takeaway** | Extract reusable methods | Practice cards, migration scenarios, code templates |
 
 **This isn't a doc generator. It's a learning path generator.**
+
+> 🎯 **[Try the Live Demo](https://code-graph-five.vercel.app/)** — Input any GitHub repo and explore its learning journey in real-time.
 
 ---
 
