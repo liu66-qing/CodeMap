@@ -1,68 +1,200 @@
 # CodeGraph
 
 <div align="center">
-  <img src="./docs/assets/en/hero-banner.png" alt="CodeGraph - helping developers understand codebases" width="100%">
+  <img src="./docs/assets/en/hero-banner.png" alt="CodeGraph - Navigate any codebase with AI agents" width="100%">
 
-  <h3>An Agentic RAG system that plans, inspects, and explains GitHub repositories like a codebase tour guide.</h3>
+  <h3>A multi-agent system that turns complex repositories into guided learning paths</h3>
 
   <p>
-    <a href="./README.zh.md">中文</a> ·
-    <a href="https://code-graph-five.vercel.app/">Live Demo</a> ·
-    <a href="https://code-graph-five.vercel.app/map">Learning Map</a> ·
-    <a href="#contributing">Contribute</a>
+    <a href="./README.md">English</a> · <a href="./README.zh.md">中文</a> · <a href="https://code-graph-five.vercel.app/" target="_blank">Live Demo</a>
   </p>
 
   <p>
-    <img src="https://img.shields.io/badge/Agent-Codebase%20Understanding-111827?style=flat-square" alt="Codebase Understanding Agent">
-    <img src="https://img.shields.io/badge/Workflow-Multi--Stage%20Planning-f59e0b?style=flat-square" alt="Multi-Stage Planning">
-    <img src="https://img.shields.io/badge/RAG-Graph--Aware%20Retrieval-7c3aed?style=flat-square" alt="Graph-Aware Retrieval">
-    <img src="https://img.shields.io/badge/Frontend-React%20%2B%20Vite-61dafb?style=flat-square" alt="React + Vite">
-    <img src="https://img.shields.io/badge/Backend-FastAPI-009688?style=flat-square" alt="FastAPI">
+    <img src="https://img.shields.io/badge/Architecture-Multi--Agent_Orchestration-ff6b6b?style=flat-square&logo=buffer" alt="Multi-Agent">
+    <img src="https://img.shields.io/badge/Agents-4_Stage_Workflow-f59e0b?style=flat-square" alt="4 Stage Agents">
+    <img src="https://img.shields.io/badge/RAG-Graph--Aware_Retrieval-7c3aed?style=flat-square&logo=neo4j" alt="Graph-Aware RAG">
+    <img src="https://img.shields.io/badge/Frontend-React_+_TypeScript-61dafb?style=flat-square&logo=react" alt="React">
+    <img src="https://img.shields.io/badge/Backend-FastAPI_+_Python_3.11-009688?style=flat-square&logo=fastapi" alt="FastAPI">
     <img src="https://img.shields.io/badge/License-Apache--2.0-blue?style=flat-square" alt="Apache 2.0">
   </p>
 </div>
 
-## Why This Exists
+---
 
-Large open-source repositories are full of hard-won engineering wisdom, but most developers never get past the file tree.
+## The Problem
 
-You open `react`, `vscode`, or `langchain`, and the same questions show up:
+You want to contribute to `react`, `vscode`, or `langchain`. You open the repository. 2,000+ files. The README tells you how to *install* the project, not how to *understand* it.
 
-- Where should I start?
-- Which files actually matter?
+You're stuck with these questions:
+
+- Where's the entry point?
 - How does the main execution flow work?
-- What design tricks are worth learning?
-- How do I turn this repo into something I can contribute to?
+- Which modules actually matter?
+- What design patterns are worth learning?
+- How do I go from "confused" to "ready to contribute"?
 
-Traditional code search gives you fragments. A normal README tells you how to use the project, not how to read it.
+Traditional code search gives you fragments. ChatGPT gives you plausible-sounding answers with no structure. You need a map.
 
-**CodeGraph is a codebase understanding agent: it plans the analysis, retrieves structural evidence, runs stage-specific reasoning, and turns the result into an explorable repository map.**
+---
 
-If that sounds useful, please consider giving the repo a star. It helps more developers discover the project, and it tells me which direction is worth building next.
+## The Solution
 
-## What CodeGraph Does
+**CodeGraph is a multi-agent orchestration system that analyzes repositories through four specialized agents**, each with distinct responsibilities, tools, and structured outputs.
 
-CodeGraph is an Agentic RAG application for repository understanding. Paste a GitHub repository URL, and the system coordinates multiple analysis agents to inspect the repo from different angles: architecture, execution flow, implementation highlights, and reusable patterns.
+Instead of a single chatbot that tries to answer everything, CodeGraph coordinates four agents that work sequentially:
 
-| Agent Stage | Question It Answers | Output |
-| --- | --- | --- |
-| **1. Overview** | What is this repo, and how is it organized? | Positioning, tech stack, module map, architecture summary |
-| **2. Main Flow** | How does the core path run? | Entry points, call flow, key logic, execution route |
-| **3. Showcase** | What implementation ideas are worth stealing? | Patterns, abstractions, design highlights, tradeoffs |
-| **4. Takeaway** | What can I reuse in my own project? | Practice cards, migration ideas, reusable mental models |
+1. **OverviewAgent** — Understands the repo's positioning, tech stack, and architecture
+2. **MainFlowAgent** — Traces the core execution path with call graph analysis
+3. **ShowcaseAgent** — Identifies design patterns and implementation highlights
+4. **TakeawayAgent** — Extracts reusable patterns you can apply to your own projects
 
-It is not trying to be another generic chatbot over code. The agent has a more opinionated job:
+Each agent uses deterministic tools (AST parsing, call tracing, dependency analysis) combined with LLM reasoning. Every tool call and LLM interaction is traced for full observability.
 
-> Build a structured mental model of an unfamiliar repository so developers can learn from it, modify it, and contribute back.
+> 🎯 **[Try the Live Demo](https://code-graph-five.vercel.app/)** — The hosted demo showcases the frontend learning map interface. Full agent workflows with graph-aware retrieval run through the backend (requires local setup).
 
-## Demo
+---
 
-Try the hosted demo:
+## How It Works
 
-- [Live Demo](https://code-graph-five.vercel.app/)
-- [Learning Map](https://code-graph-five.vercel.app/map)
+| Agent | Responsibility | Tools Used | Output |
+|-------|---------------|------------|--------|
+| **OverviewAgent** | Build mental model of the repo | `github_fetcher`, `code_parser`, `readme_summarizer` | Positioning, tech stack, architecture summary, reading order |
+| **MainFlowAgent** | Trace main execution flow | `call_graph_tracer`, `code_parser`, `github_fetcher` | Execution flow diagram with clickable nodes and code evidence |
+| **ShowcaseAgent** | Find design highlights | `pattern_matcher`, `architecture_detector`, `code_parser` | 3 design tricks with problem/solution/tradeoff/code links |
+| **TakeawayAgent** | Extract reusable patterns | All previous outputs + `pattern_matcher` | 3 reusable patterns with implementation snippets and applicability guidance |
 
-Note: the public demo currently showcases the product interaction layer. The complete agent workflow, graph-aware retrieval, and repository analysis pipeline run through the backend services.
+Each agent:
+- Receives context from the previous agent's output
+- Calls tools through a unified `call_tool()` interface (auto-traced)
+- Returns structured JSON validated against a schema
+- Records all tool calls, LLM requests, token costs, and latency
+
+---
+
+## Architecture
+
+```mermaid
+flowchart TB
+    subgraph "Input"
+        A[GitHub Repository URL]
+    end
+    
+    subgraph "Ingestion Layer"
+        B[Code Parser<br/>AST + Metadata]
+        C[Graph Builder<br/>Call Relations + Dependencies]
+    end
+    
+    subgraph "Retrieval Layer"
+        D[Hybrid Search<br/>Vector + Keyword]
+        E[Graph-Aware Retrieval<br/>Structural Relations]
+    end
+    
+    subgraph "Agent Orchestration"
+        F[OverviewAgent]
+        G[MainFlowAgent]
+        H[ShowcaseAgent]
+        I[TakeawayAgent]
+    end
+    
+    subgraph "Tools"
+        J[github_fetcher]
+        K[code_parser]
+        L[call_graph_tracer]
+        M[pattern_matcher]
+        N[architecture_detector]
+    end
+    
+    subgraph "Observability"
+        O[AgentTrace<br/>Tool calls + Token costs]
+        P[Frontend Visualization<br/>Timeline + Metrics]
+    end
+    
+    A --> B
+    A --> C
+    B --> D
+    C --> E
+    D --> F
+    E --> F
+    F --> G
+    G --> H
+    H --> I
+    
+    F -.calls.-> J
+    F -.calls.-> K
+    G -.calls.-> L
+    G -.calls.-> K
+    H -.calls.-> M
+    H -.calls.-> N
+    I -.calls.-> M
+    
+    F --> O
+    G --> O
+    H --> O
+    I --> O
+    O --> P
+    
+    I --> Q[Structured Learning Map]
+```
+
+**Key architectural decisions:**
+
+- **Agent separation of concerns**: Each agent owns one stage of understanding (overview → flow → highlights → takeaways), not a general-purpose "answer any question" interface.
+- **Tool-based execution**: Agents don't hardcode analysis logic. They compose tools (`call_graph_tracer`, `pattern_matcher`) registered at initialization.
+- **Graph-aware retrieval**: Combines semantic search with code structure (imports, calls, inheritance) — not just vector similarity.
+- **Observable by default**: Every `call_tool()` and `call_llm()` automatically records trace data (args, results, latency, tokens). The frontend visualizes agent execution timelines.
+
+---
+
+## Why Multi-Agent Orchestration?
+
+Most code understanding tools take one of two approaches:
+
+### Approach 1: Traditional RAG
+```
+Chunk code → Embed → Retrieve similar → Generate answer
+```
+**Problem**: Misses code structure. No understanding of call chains, module boundaries, or architectural patterns.
+
+### Approach 2: General chatbot
+```
+Paste repo context → Ask questions → Get answers
+```
+**Problem**: No systematic analysis. Answers are reactive, not structured. No staged progression from "what is this" to "how to use this."
+
+### CodeGraph's approach: Multi-Agent Orchestration
+```
+Overview → MainFlow → Showcase → Takeaway
+(Each agent uses tools + prior context)
+```
+
+| Capability | Traditional RAG | Chatbot | CodeGraph |
+|------------|----------------|---------|-----------|
+| Systematic repo analysis | ❌ | ❌ | ✅ 4-stage workflow |
+| Call graph tracing | ❌ | ⚠️ Depends on prompt | ✅ Dedicated tool + agent |
+| Structured outputs | ⚠️ Schema possible | ❌ Free text | ✅ JSON schema enforced |
+| Agent specialization | ❌ Single model | ❌ Single model | ✅ 4 specialized agents |
+| Full observability | ❌ | ❌ | ✅ Tool trace + token metrics |
+| Graph-aware retrieval | ❌ Vector only | ❌ Context only | ✅ Vector + code relations |
+
+**The key insight**: Understanding a codebase is not a single-turn Q&A task. It's a multi-stage workflow where each stage builds on the previous one. Each agent receives context from prior agents and contributes structured knowledge to the next.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| **Frontend** | React, TypeScript, Vite, Mantine UI, Pixel-style design system |
+| **Backend** | FastAPI, Python 3.11, async/await throughout |
+| **Agent System** | Custom orchestrator, `BaseAgent` abstraction, tool registration |
+| **Retrieval** | Hybrid search (vector + keyword), graph-aware ranking |
+| **Graph** | Code relationship modeling (calls, imports, dependencies) |
+| **Parsing** | Tree-sitter for multi-language AST parsing |
+| **LLM** | OpenAI-compatible API (configurable: GPT-4, DeepSeek, etc.) |
+| **Observability** | `AgentTrace`, `ToolCall` logging, frontend visualization |
+| **Deployment** | Docker Compose (local infra), Vercel (frontend) |
+
+---
 
 ## Screenshots
 
@@ -72,7 +204,7 @@ Note: the public demo currently showcases the product interaction layer. The com
 
 ### Learning Map
 
-<img src="./docs/design/en/learning-map.png" alt="CodeGraph learning map" width="100%">
+<img src="./docs/design/en/learning-map.png" alt="4-stage learning map with pixel-game design" width="100%">
 
 ### Stage Pages
 
@@ -80,74 +212,26 @@ Note: the public demo currently showcases the product interaction layer. The com
   <tr>
     <td width="50%">
       <img src="./docs/design/en/stage1-overview.png" alt="Overview stage">
-      <p align="center"><strong>Overview</strong></p>
+      <p align="center"><strong>① Overview</strong> — Positioning, architecture, mental model</p>
     </td>
     <td width="50%">
       <img src="./docs/design/en/stage2-mainflow.png" alt="Main Flow stage">
-      <p align="center"><strong>Main Flow</strong></p>
+      <p align="center"><strong>② Main Flow</strong> — Execution trace with call graph</p>
     </td>
   </tr>
   <tr>
     <td width="50%">
       <img src="./docs/design/en/stage3-showcase.png" alt="Showcase stage">
-      <p align="center"><strong>Showcase</strong></p>
+      <p align="center"><strong>③ Showcase</strong> — Design highlights and patterns</p>
     </td>
     <td width="50%">
       <img src="./docs/design/en/stage4-takeaway.png" alt="Takeaway stage">
-      <p align="center"><strong>Takeaway</strong></p>
+      <p align="center"><strong>④ Takeaway</strong> — Reusable patterns and code templates</p>
     </td>
   </tr>
 </table>
 
-## Why It Is Different From Basic RAG
-
-Most code RAG demos do this:
-
-```text
-chunk files -> embed chunks -> retrieve similar text -> answer
-```
-
-That is useful, but it misses structure. Code is not just text. Code has modules, call chains, dependencies, entry points, tests, and architectural boundaries.
-
-CodeGraph is designed as an agent workflow over code structure:
-
-- **Graph-aware retrieval**: combines semantic search with code relationships.
-- **Stage-specific agents**: overview, main flow, showcase, and takeaway agents each own a different reasoning objective.
-- **Tool-oriented analysis**: repository parsing, metadata extraction, retrieval, and reasoning are separate steps instead of one prompt.
-- **Structured outputs**: the agent returns maps, flows, highlights, and takeaways instead of a single loose answer.
-- **Visual agent UI**: the learning map is the interface for inspecting the agent's analysis, not the whole product by itself.
-
-## Architecture
-
-```mermaid
-flowchart LR
-  A["GitHub Repository"] --> B["Ingestion & Code Parsing"]
-  B --> C["Code Metadata"]
-  B --> D["Code Graph"]
-  C --> E["Hybrid Retrieval"]
-  D --> E
-  E --> F["Agent Orchestrator"]
-  F --> G["Overview Agent"]
-  F --> H["Main Flow Agent"]
-  F --> I["Showcase Agent"]
-  F --> J["Takeaway Agent"]
-  G --> K["Structured Agent Output"]
-  H --> K
-  I --> K
-  J --> K
-  K --> L["Learning Map UI"]
-```
-
-## Tech Stack
-
-| Layer | Stack |
-| --- | --- |
-| Frontend | React, TypeScript, Vite, Mantine, pixel-style UI |
-| Backend | FastAPI, Python 3.11 |
-| Retrieval | Hybrid retrieval, vector search, keyword retrieval |
-| Graph | Neo4j-style code relationship modeling |
-| Agent layer | Orchestrator, stage agents, tool execution, structured outputs |
-| DevOps | Docker Compose, Vercel-ready frontend |
+---
 
 ## Quick Start
 
@@ -156,37 +240,51 @@ flowchart LR
 - Python 3.11+
 - Node.js 18+
 - Docker and Docker Compose
-- An OpenAI-compatible API key
+- OpenAI-compatible API key
 
-### Clone
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/liu66-qing/CodeGraph.git
 cd CodeGraph
 ```
 
-### Configure
+### 2. Configure environment
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` with your model and service settings.
+Edit `.env` with your API keys and service configuration:
 
-### Start Infrastructure
+```env
+# LLM Configuration
+OPENAI_API_KEY=your_api_key_here
+OPENAI_BASE_URL=https://api.openai.com/v1  # Or DeepSeek, etc.
+
+# Database & Cache
+NEO4J_URI=bolt://localhost:7687
+REDIS_URL=redis://localhost:6379
+```
+
+### 3. Start infrastructure services
 
 ```bash
 docker-compose up -d
 ```
 
-### Start Backend
+This starts Neo4j (graph database) and Redis (cache).
+
+### 4. Start backend
 
 ```bash
 pip install -e ".[dev]"
-uvicorn evograph.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn codegraph.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Start Frontend
+Backend runs at `http://localhost:8000`. API docs at `http://localhost:8000/docs`.
+
+### 5. Start frontend
 
 ```bash
 cd frontend
@@ -194,46 +292,67 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`.
+Frontend runs at `http://localhost:5173`.
+
+---
 
 ## Project Structure
 
-```text
-.
-├── frontend/              # React + Vite frontend
-├── src/evograph/          # FastAPI, agents, RAG, graph, ingestion
-├── tests/                 # Unit and integration tests
-├── docs/                  # Design docs, screenshots, README assets
-├── alembic/               # Database migrations
-├── docker-compose.yml     # Local infrastructure
-└── pyproject.toml         # Python project metadata
 ```
+.
+├── frontend/                  # React + Vite frontend
+│   ├── src/
+│   │   ├── components/        # Reusable UI components
+│   │   ├── pages/             # 4 stage pages + home + learning map
+│   │   ├── i18n/              # EN/ZH language dictionaries
+│   │   └── assets/pixel/      # Pixel-art design assets
+├── src/codegraph/             # Python backend
+│   ├── agent/
+│   │   ├── base.py            # BaseAgent, AgentTrace, ToolCall
+│   │   ├── stages/            # OverviewAgent, MainFlowAgent, etc.
+│   │   ├── tools/             # github_fetcher, code_parser, etc.
+│   │   └── orchestrator.py    # Agent coordination logic
+│   ├── retrieval/             # Hybrid + graph-aware retrieval
+│   ├── graph/                 # Code relationship modeling
+│   ├── parsers/               # Tree-sitter AST parsing
+│   └── main.py                # FastAPI application
+├── tests/                     # Unit and integration tests
+├── docs/                      # Design docs, PRD, screenshots
+└── docker-compose.yml         # Local infrastructure
+```
+
+---
 
 ## Roadmap
 
-- [ ] Better support for large TypeScript / Python repositories
-- [ ] More accurate call-chain and module relationship extraction
-- [ ] GitHub issue and PR context analysis
-- [ ] Exportable learning reports in Markdown / PDF
-- [ ] Public backend deployment for end-to-end hosted demos
-- [ ] More examples from real-world open-source projects
+- [ ] Enhanced call graph accuracy for large TypeScript/Python repos
+- [ ] Multi-file pattern detection (e.g., middleware chains across files)
+- [ ] GitHub issue/PR context integration
+- [ ] Export learning maps as Markdown or PDF
+- [ ] Public backend deployment for full end-to-end hosted demo
+- [ ] Example analyses for popular repos (React, FastAPI, LangChain)
+
+---
 
 ## Contributing
 
-CodeGraph is early, and the best contributions right now are concrete and practical:
+CodeGraph is early-stage and welcomes contributions.
 
-- Star the project if the idea resonates.
-- Open an issue with a repo you want CodeGraph to understand better.
-- Suggest better agent stages, tool calls, or structured outputs.
-- Contribute analyzers for new languages or frameworks.
-- Improve prompts, screenshots, docs, or onboarding.
+**How to contribute:**
 
-Good first issues to propose:
+- ⭐ **Star the repo** if the multi-agent approach resonates with you
+- 🐛 **Open issues** for bugs or repos that don't analyze well
+- 💡 **Suggest improvements** to agent prompts, tools, or architectures
+- 🔧 **Submit PRs** for new language parsers, analysis tools, or UI improvements
 
-- "Add support for analyzing Next.js App Router repos"
-- "Improve call flow extraction for FastAPI projects"
-- "Add a sample analysis for LangChain"
-- "Export agent analysis as Markdown"
+**Good first issues:**
+
+- Add support for Rust/Go/Java AST parsing
+- Improve call flow extraction for async/await heavy codebases
+- Add a sample analysis for a popular repo (Next.js, Vue, etc.)
+- Export agent analysis results as structured Markdown
+
+---
 
 ## License
 
@@ -242,7 +361,8 @@ Apache-2.0. See [LICENSE](./LICENSE).
 ---
 
 <div align="center">
-  <strong>If CodeGraph helps you read one scary repo faster, please leave a star.</strong>
+  <strong>If CodeGraph helps you understand one complex repo faster, please leave a star.</strong>
   <br>
-  Stars, issues, and PRs are the signal that this should keep growing.
+  <sub>Stars tell me this approach is worth building further.</sub>
 </div>
+
