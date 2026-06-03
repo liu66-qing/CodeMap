@@ -132,7 +132,7 @@ export default function Home() {
               {lang === 'en' ? (
                 <>
                   <span className="cg-code-marks" aria-hidden="true">&lt;/&gt;</span>
-                  <span className="cg-brand-word">CodeGraph</span>
+                  <span className="cg-brand-word">CodeMap</span>
                   <span className="cg-code-marks" aria-hidden="true">&lt;/&gt;</span>
                   <span className="cg-title-en-line">Helping Every</span>
                   <span className="cg-title-en-line is-accent">Hometown Hero</span>
@@ -140,7 +140,7 @@ export default function Home() {
                 </>
               ) : (
                 <>
-                  <span className="cg-brand-word">CodeGraph</span>
+                  <span className="cg-brand-word">CodeMap</span>
                   <span className="cg-title-cn">{t('home.title.cn')}<span>{t('home.title.cn2')}</span></span>
                 </>
               )}

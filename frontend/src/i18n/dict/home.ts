@@ -1,7 +1,7 @@
 import type { Dict } from '../translations'
 
 export const home: Dict = {
-  'home.title.brand': { en: 'CodeGraph', zh: 'CodeGraph' },
+  'home.title.brand': { en: 'CodeMap', zh: 'CodeMap' },
   'home.title.cn': { en: 'Understand any codebase', zh: '让每个老乡' },
   'home.title.cn2': { en: 'like a local', zh: '看懂代码！' },
   'home.subtitle': {
@@ -16,8 +16,8 @@ export const home: Dict = {
   'home.startExplore': { en: 'Start Exploring', zh: '开始探索' },
   'home.hotRepos': { en: 'Popular repos:', zh: '热门仓库：' },
   'home.shuffle': { en: 'Shuffle', zh: '换一换' },
-  'home.heroAria': { en: 'CodeGraph home', zh: 'CodeGraph 首页' },
-  'home.titleAria': { en: 'CodeGraph helps everyone understand code!', zh: 'CodeGraph 让每个老乡看懂代码！' },
+  'home.heroAria': { en: 'CodeMap home', zh: 'CodeMap 首页' },
+  'home.titleAria': { en: 'CodeMap helps everyone understand code!', zh: 'CodeMap 让每个老乡看懂代码！' },
   'home.journeyAria': { en: 'Learning path map', zh: '学习路径图' },
   'home.lowerAria': { en: 'Learning info', zh: '学习信息' },
 

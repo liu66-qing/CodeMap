@@ -150,7 +150,7 @@ export const api = {
     ),
   // Repo-scoped code-symbol search (global search bar in GraphExplorer).
   searchRepoSymbols: (repoId: string, q: string) =>
-    request<CodeGraphNode[]>(
+    request<CodeMapNode[]>(
       `/graph/entities?repo_id=${encodeURIComponent(repoId)}&q=${encodeURIComponent(q)}`
     ),
 
@@ -222,7 +222,7 @@ export interface AnalyzeRepoResponse {
   mode: string // "async" | "background"
 }
 
-export interface CodeGraphNode {
+export interface CodeMapNode {
   id: string
   name: string
   kind: string | null // module | class | function | method
@@ -230,7 +230,7 @@ export interface CodeGraphNode {
   file_path: string | null
 }
 
-export interface CodeGraphEdge {
+export interface CodeMapEdge {
   source: string
   target: string
   type: string // CALLS | IMPORTS | INHERITS | DEFINES
@@ -238,8 +238,8 @@ export interface CodeGraphEdge {
 
 export interface RepoGraphResponse {
   repo_id: string
-  nodes: CodeGraphNode[]
-  edges: CodeGraphEdge[]
+  nodes: CodeMapNode[]
+  edges: CodeMapEdge[]
 }
 
 export interface RepoCommit {
@@ -351,7 +351,7 @@ export interface ReviewReport {
 export interface SymbolDetail {
   repo_id: string
   symbol: string
-  node: CodeGraphNode | null
+  node: CodeMapNode | null
   callers: { caller: string; file_path: string | null }[]
   callees: { callee: string; file_path: string | null }[]
   module: string | null

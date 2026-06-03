@@ -1,4 +1,4 @@
-# CodeGraph
+# CodeMap
 
 <div align="center">
   <img src="./docs/assets/github标题背景图.png" alt="CodeGraph - 用 AI Agent 带你读懂任何代码仓库" width="100%">
@@ -39,7 +39,7 @@
 
 ---
 
-## CodeGraph 是什么
+## CodeMap 是什么
 
 CodeGraph 不是又一个"代码问答机器人"，而是一个**多 Agent 协作编排系统**。
 

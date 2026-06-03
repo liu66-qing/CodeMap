@@ -53,7 +53,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="cg-sidebar-inner">
           <div className="cg-sidebar-brand">
             <PixelLogo size={42} />
-            <Text className="cg-brand-name">CodeGraph</Text>
+            <Text className="cg-brand-name">CodeMap</Text>
           </div>
 
           <nav className="cg-main-nav" aria-label={t('nav.mainNavLabel')}>
@@ -99,7 +99,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <Group h="100%" px={16} justify="space-between">
           <Group gap={8}>
             <PixelLogo size={32} />
-            <Text fw={800}>CodeGraph</Text>
+            <Text fw={800}>CodeMap</Text>
           </Group>
           <Burger opened={opened} onClick={toggle} size="sm" color="#fff" />
         </Group>

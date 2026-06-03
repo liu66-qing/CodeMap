@@ -4,7 +4,7 @@ import * as d3 from 'd3'
 import { Search, GitBranch, AlertCircle, Layers, Share2, Sparkles, Cpu, LayoutGrid } from 'lucide-react'
 import {
   api,
-  type CodeGraphNode,
+  type CodeMapNode,
   type SymbolDetail,
   type ArchitectureSummary,
   type Persona,
@@ -95,7 +95,7 @@ function shortName(qname: string): string {
   return parts.length <= 2 ? qname : parts.slice(-2).join('.')
 }
 
-function toNode(n: CodeGraphNode): GraphNode {
+function toNode(n: CodeMapNode): GraphNode {
   return {
     id: n.id || n.name,
     name: n.name,

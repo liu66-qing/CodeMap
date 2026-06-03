@@ -1,4 +1,4 @@
-# CodeGraph
+# CodeMap
 
 <div align="center">
   <img src="./docs/assets/en/hero-banner.png" alt="CodeGraph - Navigate any codebase with AI agents" width="100%">
@@ -161,7 +161,7 @@ Paste repo context → Ask questions → Get answers
 ```
 **Problem**: No systematic analysis. Answers are reactive, not structured. No staged progression from "what is this" to "how to use this."
 
-### CodeGraph's approach: Multi-Agent Orchestration
+### CodeMap's approach: Multi-Agent Orchestration
 ```
 Overview → MainFlow → Showcase → Takeaway
 (Each agent uses tools + prior context)

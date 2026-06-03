@@ -224,7 +224,7 @@ export default function AgentTrace() {
               <Table.Tr>
                 <Table.Th>Dimension</Table.Th>
                 <Table.Th>Traditional RAG</Table.Th>
-                <Table.Th>CodeGraph Multi-Agent</Table.Th>
+                <Table.Th>CodeMap Multi-Agent</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
