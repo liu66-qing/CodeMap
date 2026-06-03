@@ -23,7 +23,7 @@
 
 ## The Problem
 
-You want to contribute to `react`, `vscode`, or `langchain`. You open the repository. 2,000+ files. The README tells you how to *install* the project, not how to *understand* it.
+You want to learn from `react`, `vscode`, or `langchain` — understand how they're built, what makes their design good. You open the repository. 2,000+ files. The README tells you how to *install* the project, not how to *understand* it.
 
 You're stuck with these questions:
 
@@ -31,7 +31,7 @@ You're stuck with these questions:
 - How does the main execution flow work?
 - Which modules actually matter?
 - What design patterns are worth learning?
-- How do I go from "confused" to "ready to contribute"?
+- How do I go from "confused" to "I actually get it"?
 
 Traditional code search gives you fragments. ChatGPT gives you plausible-sounding answers with no structure. You need a map.
 
