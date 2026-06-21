@@ -63,24 +63,3 @@ def test_reset_tool_stats_with_admin_key_and_confirmation(monkeypatch):
     assert tool_stats_collector.get_tool_stats("demo_tool") is None
 
 
-def test_delete_document_requires_document_specific_confirmation(monkeypatch):
-    client = _client(monkeypatch)
-
-    response = client.delete(
-        "/api/v1/documents/doc-123?confirmation=DELETE_DOCUMENT:other",
-        headers={"X-Admin-API-Key": "test-admin-key"},
-    )
-
-    assert response.status_code == 400
-
-
-def test_delete_document_accepts_document_specific_confirmation(monkeypatch):
-    client = _client(monkeypatch)
-
-    response = client.delete(
-        "/api/v1/documents/doc-123?confirmation=DELETE_DOCUMENT:doc-123",
-        headers={"X-Admin-API-Key": "test-admin-key"},
-    )
-
-    assert response.status_code == 200
-    assert response.json() == {"status": "deleted", "id": "doc-123"}

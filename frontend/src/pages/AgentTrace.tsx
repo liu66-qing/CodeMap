@@ -213,45 +213,51 @@ export default function AgentTrace() {
           </Card>
         )}
 
-        {/* Agent vs RAG Comparison */}
+        {/* System Metrics Summary */}
         <Card shadow="sm" padding="lg" radius="md" withBorder>
           <Card.Section withBorder inheritPadding py="xs">
-            <Text fw={600}>Agent System vs Traditional RAG</Text>
+            <Group gap="xs">
+              <Activity size={20} />
+              <Text fw={600}>System Metrics</Text>
+            </Group>
           </Card.Section>
 
           <Table mt="md" striped>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Dimension</Table.Th>
-                <Table.Th>Traditional RAG</Table.Th>
-                <Table.Th>CodeMap Multi-Agent</Table.Th>
+                <Table.Th>Metric</Table.Th>
+                <Table.Th>Value</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
               <Table.Tr>
-                <Table.Td><Text fw={600}>Workflow</Text></Table.Td>
-                <Table.Td>Query → Retrieve → Generate</Table.Td>
-                <Table.Td>Query → <strong>Plan</strong> → <strong>Tool Selection</strong> → Execute → <strong>Reflect</strong></Table.Td>
+                <Table.Td><Text fw={600}>Total Tools Registered</Text></Table.Td>
+                <Table.Td>{Object.keys(toolStats).length}</Table.Td>
               </Table.Tr>
               <Table.Tr>
-                <Table.Td><Text fw={600}>Collaboration</Text></Table.Td>
-                <Table.Td>Single-turn, stateless</Table.Td>
-                <Table.Td><strong>4-stage orchestration</strong>, explicit context passing</Table.Td>
+                <Table.Td><Text fw={600}>Total Invocations</Text></Table.Td>
+                <Table.Td>
+                  {Object.values(toolStats).reduce((sum, t) => sum + t.call_count, 0)}
+                </Table.Td>
               </Table.Tr>
               <Table.Tr>
-                <Table.Td><Text fw={600}>Parallelism</Text></Table.Td>
-                <Table.Td>None</Table.Td>
-                <Table.Td><strong>MainFlow + Showcase parallel execution</strong></Table.Td>
+                <Table.Td><Text fw={600}>Avg Latency (all tools)</Text></Table.Td>
+                <Table.Td>
+                  {topTools.length > 0
+                    ? (topTools.reduce((sum, t) => sum + t.avg_duration_ms, 0) / topTools.length).toFixed(1)
+                    : 0}ms
+                </Table.Td>
               </Table.Tr>
               <Table.Tr>
-                <Table.Td><Text fw={600}>Fault Tolerance</Text></Table.Td>
-                <Table.Td>Fails immediately</Table.Td>
-                <Table.Td><strong>Error isolation</strong>, graceful degradation</Table.Td>
-              </Table.Tr>
-              <Table.Tr>
-                <Table.Td><Text fw={600}>Observability</Text></Table.Td>
-                <Table.Td>Black box</Table.Td>
-                <Table.Td><strong>Full trace</strong> (tool calls + reasoning)</Table.Td>
+                <Table.Td><Text fw={600}>Tools with Errors</Text></Table.Td>
+                <Table.Td>
+                  <Badge
+                    color={Object.values(toolStats).filter(t => t.error_rate > 0).length > 0 ? 'red' : 'green'}
+                    variant="light"
+                  >
+                    {Object.values(toolStats).filter(t => t.error_rate > 0).length}
+                  </Badge>
+                </Table.Td>
               </Table.Tr>
             </Table.Tbody>
           </Table>

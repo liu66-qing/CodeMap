@@ -2,6 +2,16 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "backend",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "uvicorn", "codegraph.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"],
+      "port": 8080,
+      "cwd": ".",
+      "env": {
+        "PYTHONPATH": "src"
+      }
+    },
+    {
       "name": "frontend",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
