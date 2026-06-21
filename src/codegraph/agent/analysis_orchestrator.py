@@ -20,6 +20,7 @@ from typing import Any, Callable
 
 import structlog
 
+from codegraph.agent.communication.protocol import SharedState
 from codegraph.agent.stages import (
     OverviewAgent,
     MainFlowAgent,
@@ -43,6 +44,7 @@ class AnalysisOrchestrator:
     ) -> None:
         self.tools = tools or STAGE_TOOLS
         self.llm_client = llm_client
+        self._shared_state = SharedState()
         self.overview_agent = OverviewAgent(self.tools, self.llm_client)
         self.mainflow_agent = MainFlowAgent(self.tools, self.llm_client)
         self.showcase_agent = ShowcaseAgent(self.tools, self.llm_client)
@@ -70,6 +72,10 @@ class AnalysisOrchestrator:
         _emit(on_progress, "mainflow", "running")
         _emit(on_progress, "showcase", "running")
 
+        # Publish context to shared state for parallel agents
+        await self._shared_state.write("repo_url", context.get("repo_url", ""), writer="orchestrator")
+        await self._shared_state.write("architecture_summary", context.get("architectureSummary", ""), writer="orchestrator")
+
         mainflow_task = asyncio.create_task(
             self._safe_run(self.mainflow_agent, dict(context), "mainflow")
         )
@@ -80,6 +86,10 @@ class AnalysisOrchestrator:
         mainflow, showcase = await asyncio.gather(mainflow_task, showcase_task)
         results["mainflow"] = mainflow
         results["showcase"] = showcase
+
+        await self._shared_state.write("mainflow_result", mainflow, writer="mainflow_agent")
+        await self._shared_state.write("showcase_result", showcase, writer="showcase_agent")
+
         _emit(on_progress, "mainflow", "done" if mainflow else "failed")
         _emit(on_progress, "showcase", "done" if showcase else "failed")
 
@@ -90,6 +100,10 @@ class AnalysisOrchestrator:
             context["highlights"] = showcase.get("highlights", [])
 
         # === Stage 4: Takeaway ===
+        # Takeaway agent gets full picture from shared state
+        shared_snapshot = await self._shared_state.get_snapshot()
+        context["_shared_state"] = shared_snapshot
+
         _emit(on_progress, "takeaway", "running")
         takeaway = await self._safe_run(self.takeaway_agent, context, "takeaway")
         results["takeaway"] = takeaway
@@ -102,6 +116,10 @@ class AnalysisOrchestrator:
             "takeaway": self.takeaway_agent.trace.to_dict(),
         }
         return results
+
+    async def get_shared_state_snapshot(self) -> dict:
+        """Expose shared state for debugging/observability."""
+        return await self._shared_state.get_snapshot()
 
     async def _safe_run(self, agent, context: dict, stage_name: str) -> dict:
         try:

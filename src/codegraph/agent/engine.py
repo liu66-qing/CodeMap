@@ -14,6 +14,15 @@ from codegraph.llm.client import llm_client
 from codegraph.agent.tools.registry import tool_registry
 from codegraph.models.domain import AgentResponse, ReasoningStep
 
+try:
+    from codegraph.agent.memory.manager import MemoryManager
+    from codegraph.agent.memory.base import MemoryType, MemoryPriority
+    from codegraph.agent.compression.context_manager import ContextWindowManager
+
+    _MEMORY_AVAILABLE = True
+except ImportError:
+    _MEMORY_AVAILABLE = False
+
 logger = structlog.get_logger()
 
 
@@ -141,6 +150,14 @@ class AgentExecutionEngine:
         self.max_iterations = max_iterations
         self.token_budget = token_budget
 
+        # Memory and context compression integration
+        if _MEMORY_AVAILABLE:
+            self._memory = MemoryManager(short_term_tokens=4000)
+            self._context_manager = ContextWindowManager(max_tokens=self.token_budget)
+        else:
+            self._memory = None
+            self._context_manager = None
+
     async def run(self, question: str, session_context: str = "") -> AgentResponse:
         memory = WorkingMemory(question=question)
         state = AgentState.PLANNING
@@ -152,6 +169,23 @@ class AgentExecutionEngine:
         if session_context:
             messages.append({"role": "system", "content": f"对话上下文：{session_context}"})
         messages.append({"role": "user", "content": question})
+
+        # Memory integration: store query and recall relevant context
+        if self._memory:
+            try:
+                await self._memory.remember(
+                    content=f"User query: {question}",
+                    memory_type=MemoryType.EPISODIC,
+                    priority=MemoryPriority.HIGH,
+                )
+
+                relevant_memories = await self._memory.recall(question, top_k=3)
+                memory_context = "\n".join(f"- {m.content}" for m in relevant_memories)
+                if memory_context:
+                    session_context = f"{session_context}\n\nRelevant memory:\n{memory_context}"
+                    messages.append({"role": "system", "content": f"Relevant memory:\n{memory_context}"})
+            except Exception as e:
+                logger.warning("memory_recall_failed", error=str(e))
 
         while state not in (AgentState.DONE, AgentState.FAILED):
             memory.state_history.append(state.value)
@@ -183,6 +217,18 @@ class AgentExecutionEngine:
             duration_ms=total_ms,
             states=memory.state_history,
         )
+
+        # Store result in memory for future recall
+        if self._memory:
+            try:
+                await self._memory.remember(
+                    content=f"Q: {question}\nA: {answer}",
+                    memory_type=MemoryType.SEMANTIC,
+                    priority=MemoryPriority.NORMAL,
+                )
+                await self._memory.consolidate()
+            except Exception as e:
+                logger.warning("memory_store_failed", error=str(e))
 
         return AgentResponse(
             answer=answer,

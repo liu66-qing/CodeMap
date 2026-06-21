@@ -23,6 +23,12 @@ async def query(request: QueryRequest) -> QueryResponse:
     query_id = str(uuid.uuid4())
     logger.info("query_received", query_id=query_id, question=request.question)
 
+    # Bind session to memory if available
+    if hasattr(request, 'session_id') and request.session_id:
+        if hasattr(orchestrator, '_engine') and hasattr(orchestrator._engine, '_memory'):
+            if orchestrator._engine._memory:
+                orchestrator._engine._memory.set_session(request.session_id)
+
     result = await orchestrator.run(
         question=request.question,
         session_id=request.session_id,

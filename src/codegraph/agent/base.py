@@ -24,6 +24,7 @@ import structlog
 
 from codegraph.llm.client import llm_client as default_llm_client
 from codegraph.agent.tools.stats import tool_stats_collector
+from codegraph.agent.communication.guardrails import AgentGuardrails, GuardrailViolation
 
 logger = structlog.get_logger()
 
@@ -120,6 +121,7 @@ class BaseAgent(ABC):
         self.tools = tools
         self.llm = llm_client or default_llm_client
         self.trace = AgentTrace(agent_name=name, started_at=0.0)
+        self._guardrails: AgentGuardrails | None = None
 
     @abstractmethod
     async def analyze(self, context: dict) -> dict:
@@ -130,6 +132,10 @@ class BaseAgent(ABC):
             raise ValueError(
                 f"Tool '{tool_name}' not registered for agent '{self.name}'"
             )
+        if self._guardrails:
+            violation = self._guardrails.check_action(tool_name, kwargs)
+            if violation and violation.severity == "critical":
+                raise RuntimeError(f"Guardrail violation: {violation.description}")
         start = time.time()
         err: str | None = None
         result: Any = None
@@ -225,6 +231,9 @@ class BaseAgent(ABC):
             )
         )
 
+        if self._guardrails:
+            self._guardrails.record_tokens(tokens_in + tokens_out)
+
         if want_json:
             try:
                 return json.loads(content)
@@ -240,6 +249,12 @@ class BaseAgent(ABC):
 
     async def run(self, context: dict) -> dict:
         self.trace = AgentTrace(agent_name=self.name, started_at=time.time())
+        self._guardrails = AgentGuardrails(
+            goal=context.get("_query", context.get("repo_url", "")),
+            max_steps=20,
+            max_tokens=100000,
+            max_wall_time=300.0,
+        )
         try:
             output = await self.analyze(context)
             self.trace.output = output
