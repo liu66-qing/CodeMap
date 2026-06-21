@@ -3,7 +3,7 @@
 <div align="center">
   <img src="./docs/assets/en/hero-banner.png" alt="CodeGraph - Navigate any codebase with AI agents" width="100%">
 
-  <h3>A multi-agent system that turns complex repositories into guided learning paths</h3>
+  <h3>A production-grade multi-agent system with memory hierarchy, adaptive execution, and guardrails</h3>
 
   <p>
     <a href="./README.md">English</a> · <a href="./README.zh.md">中文</a> · <a href="https://code-graph-five.vercel.app/" target="_blank">Live Demo</a>
@@ -11,11 +11,12 @@
 
   <p>
     <img src="https://img.shields.io/badge/Architecture-Multi--Agent_Orchestration-ff6b6b?style=flat-square&logo=buffer" alt="Multi-Agent">
-    <img src="https://img.shields.io/badge/Agents-4_Stage_Workflow-f59e0b?style=flat-square" alt="4 Stage Agents">
+    <img src="https://img.shields.io/badge/Memory-3--Tier_Hierarchy-10b981?style=flat-square" alt="Memory">
+    <img src="https://img.shields.io/badge/Execution-ReAct_+_Plan--Execute-f59e0b?style=flat-square" alt="Execution Modes">
     <img src="https://img.shields.io/badge/RAG-Graph--Aware_Retrieval-7c3aed?style=flat-square&logo=neo4j" alt="Graph-Aware RAG">
-    <img src="https://img.shields.io/badge/Frontend-React_+_TypeScript-61dafb?style=flat-square&logo=react" alt="React">
+    <img src="https://img.shields.io/badge/Communication-Pub/Sub_+_Blackboard-ec4899?style=flat-square" alt="Agent Communication">
     <img src="https://img.shields.io/badge/Backend-FastAPI_+_Python_3.11-009688?style=flat-square&logo=fastapi" alt="FastAPI">
-    <img src="https://img.shields.io/badge/License-Apache--2.0-blue?style=flat-square" alt="Apache 2.0">
+    <img src="https://img.shields.io/badge/Guardrails-Loop_+_Drift_Detection-ef4444?style=flat-square" alt="Guardrails">
   </p>
 </div>
 
@@ -73,75 +74,81 @@ Each agent:
 
 ## Architecture
 
-```mermaid
-flowchart TB
-    subgraph "Input"
-        A[GitHub Repository URL]
-    end
-    
-    subgraph "Ingestion Layer"
-        B[Code Parser<br/>AST + Metadata]
-        C[Graph Builder<br/>Call Relations + Dependencies]
-    end
-    
-    subgraph "Retrieval Layer"
-        D[Hybrid Search<br/>Vector + Keyword]
-        E[Graph-Aware Retrieval<br/>Structural Relations]
-    end
-    
-    subgraph "Agent Orchestration"
-        F[OverviewAgent]
-        G[MainFlowAgent]
-        H[ShowcaseAgent]
-        I[TakeawayAgent]
-    end
-    
-    subgraph "Tools"
-        J[github_fetcher]
-        K[code_parser]
-        L[call_graph_tracer]
-        M[pattern_matcher]
-        N[architecture_detector]
-    end
-    
-    subgraph "Observability"
-        O[AgentTrace<br/>Tool calls + Token costs]
-        P[Frontend Visualization<br/>Timeline + Metrics]
-    end
-    
-    A --> B
-    A --> C
-    B --> D
-    C --> E
-    D --> F
-    E --> F
-    F --> G
-    G --> H
-    H --> I
-    
-    F -.calls.-> J
-    F -.calls.-> K
-    G -.calls.-> L
-    G -.calls.-> K
-    H -.calls.-> M
-    H -.calls.-> N
-    I -.calls.-> M
-    
-    F --> O
-    G --> O
-    H --> O
-    I --> O
-    O --> P
-    
-    I --> Q[Structured Learning Map]
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          CodeMap Agent System                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌─────────────┐   ┌─────────────────────────────────────────────────────┐  │
+│  │   Session    │   │              Agent Orchestration                     │  │
+│  │  Manager     │   │                                                     │  │
+│  │             │   │  ┌──────────┐  ┌──────────┐  ┌──────────┐          │  │
+│  │ • State FSM │   │  │ Overview │  │ MainFlow │  │ Showcase │  → ...   │  │
+│  │ • Fork      │   │  │  Agent   │  │  Agent   │  │  Agent   │          │  │
+│  │ • TTL       │   │  └────┬─────┘  └────┬─────┘  └────┬─────┘          │  │
+│  └──────┬──────┘   │       │              │              │               │  │
+│         │          │       ▼              ▼              ▼               │  │
+│         │          │  ┌─────────────────────────────────────────────┐    │  │
+│         │          │  │         Execution Mode Selector              │    │  │
+│         │          │  │  simple query → ReAct | complex → Plan-Exec  │    │  │
+│         │          │  └─────────────────────────────────────────────┘    │  │
+│         │          └─────────────────────────────────────────────────────┘  │
+│         │                                                                    │
+│  ┌──────┴──────────────────────────────────────────────────────────────┐    │
+│  │                    Memory Hierarchy                                   │    │
+│  │                                                                      │    │
+│  │  ┌─────────────┐  ┌─────────────────┐  ┌───────────────────────┐   │    │
+│  │  │ Short-Term  │  │    Long-Term     │  │    Consolidation      │   │    │
+│  │  │ (Working)   │  │   (Persistent)   │  │   (STM → LTM)        │   │    │
+│  │  │             │  │                  │  │                       │   │    │
+│  │  │ OrderedDict │  │ Qdrant + Redis   │  │ • Access frequency    │   │    │
+│  │  │ ~4K tokens  │  │ Semantic search  │  │ • Priority escalation │   │    │
+│  │  │ LRU evict   │  │ Vector retrieval │  │ • Entity-linked       │   │    │
+│  │  └─────────────┘  └─────────────────┘  └───────────────────────┘   │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │                Multi-Agent Communication                              │   │
+│  │                                                                       │   │
+│  │  ┌──────────────┐  ┌──────────────────┐  ┌────────────────────┐     │   │
+│  │  │ Message Bus  │  │  Shared State    │  │    Guardrails       │     │   │
+│  │  │ (Pub/Sub)    │  │  (Blackboard)    │  │                    │     │   │
+│  │  │              │  │                  │  │ • Loop detection    │     │   │
+│  │  │ Redis Stream │  │ Optimistic CAS   │  │ • Drift detection   │     │   │
+│  │  │ Topic route  │  │ Version control  │  │ • Token budget      │     │   │
+│  │  │ Dead letter  │  │ Full snapshot    │  │ • Wall-clock cap    │     │   │
+│  │  └──────────────┘  └──────────────────┘  └────────────────────┘     │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│  ┌──────────────────────────────┐  ┌────────────────────────────────────┐   │
+│  │   Context Compression         │  │     Tool & Skill System            │   │
+│  │                               │  │                                    │   │
+│  │  Zone 1: Recent (verbatim)   │  │  • Dynamic loader (*_tool.py)     │   │
+│  │  Zone 2: Middle (summary)    │  │  • JSON Schema validation         │   │
+│  │  Zone 3: Distant (entities)  │  │  • Trigger-based skills           │   │
+│  │                               │  │  • Invocation tracing             │   │
+│  │  Trigger: 80% utilization    │  │  • Skill composition (DAG)        │   │
+│  └──────────────────────────────┘  └────────────────────────────────────┘   │
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │                    Infrastructure                                     │   │
+│  │  Neo4j (graph) │ Qdrant (vectors) │ Redis (state) │ PostgreSQL (meta)│   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Key architectural decisions:**
 
-- **Agent separation of concerns**: Each agent owns one stage of understanding (overview → flow → highlights → takeaways), not a general-purpose "answer any question" interface.
-- **Tool-based execution**: Agents don't hardcode analysis logic. They compose tools (`call_graph_tracer`, `pattern_matcher`) registered at initialization.
-- **Graph-aware retrieval**: Combines semantic search with code structure (imports, calls, inheritance) — not just vector similarity.
-- **Observable by default**: Every `call_tool()` and `call_llm()` automatically records trace data (args, results, latency, tokens). The frontend visualizes agent execution timelines.
+| Decision | Choice | Why Not Alternative |
+|----------|--------|-------------------|
+| Memory storage (STM) | In-memory OrderedDict | Redis RTT (~50ms) unacceptable on hot path |
+| Memory storage (LTM) | Qdrant + Redis | FAISS lacks persistence + filtering |
+| Agent communication | Pub/Sub + Blackboard | Direct RPC creates coupling; blackboard enables crash recovery |
+| Execution mode | Adaptive (ReAct/Plan-Exec) | Single mode either over-plans simple queries or under-plans complex ones |
+| Context compression | Hybrid 3-zone | Single strategy trades off too much in one dimension |
+| Loop prevention | Fingerprint + N-gram | Token-only budgets can't detect semantic repetition |
+| Session persistence | Redis with TTL | Sessions are ephemeral; PostgreSQL overkill for 7-day data |
+| Shared state concurrency | Optimistic CAS (version numbers) | Pessimistic locks risk deadlock in async multi-agent |
 
 ---
 
@@ -182,17 +189,18 @@ Overview → MainFlow → Showcase → Takeaway
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| **Frontend** | React, TypeScript, Vite, Mantine UI, Pixel-style design system |
-| **Backend** | FastAPI, Python 3.11, async/await throughout |
-| **Agent System** | Custom orchestrator, `BaseAgent` abstraction, tool registration |
-| **Retrieval** | Hybrid search (vector + keyword), graph-aware ranking |
-| **Graph** | Code relationship modeling (calls, imports, dependencies) |
-| **Parsing** | Tree-sitter for multi-language AST parsing |
-| **LLM** | OpenAI-compatible API (configurable: GPT-4, DeepSeek, etc.) |
-| **Observability** | `AgentTrace`, `ToolCall` logging, frontend visualization |
-| **Deployment** | Docker Compose (local infra), Vercel (frontend) |
+| Layer | Technology | Design Choice |
+|-------|-----------|---------------|
+| **Agent Memory** | 3-tier: OrderedDict (STM) + Qdrant/Redis (LTM) | STM in-memory for latency; LTM persistent for retrieval |
+| **Execution** | ReAct + Plan-Execute with adaptive selector | Simple queries avoid planning overhead; complex get decomposition |
+| **Communication** | Pub/Sub (Redis Streams) + Blackboard (shared state) | Decoupled agents + crash-recoverable coordination |
+| **Compression** | Hybrid 3-zone (verbatim/summary/entity) | Mirrors human memory: vivid recent, gist of middle, facts from past |
+| **Guardrails** | Loop detection + Drift detector + Token/Time caps | Defense-in-depth: no single failure mode uncovered |
+| **Retrieval** | Vector (Qdrant) + Keyword (BM25) + Graph (Neo4j) | Semantic + lexical + structural = comprehensive recall |
+| **Backend** | FastAPI, Python 3.11, fully async | Non-blocking I/O for concurrent agent execution |
+| **Frontend** | React 18, TypeScript, Mantine UI, D3 | Interactive agent trace visualization |
+| **LLM** | OpenAI-compatible (GPT-4/DeepSeek/configurable) | Provider-agnostic; swap without code changes |
+| **Observability** | Structlog + OpenTelemetry + AgentTrace | Every tool call and LLM interaction fully traced |
 
 ---
 
@@ -299,38 +307,75 @@ Frontend runs at `http://localhost:5173`.
 ## Project Structure
 
 ```
-.
-├── frontend/                  # React + Vite frontend
-│   ├── src/
-│   │   ├── components/        # Reusable UI components
-│   │   ├── pages/             # 4 stage pages + home + learning map
-│   │   ├── i18n/              # EN/ZH language dictionaries
-│   │   └── assets/pixel/      # Pixel-art design assets
-├── src/codegraph/             # Python backend
-│   ├── agent/
-│   │   ├── base.py            # BaseAgent, AgentTrace, ToolCall
-│   │   ├── stages/            # OverviewAgent, MainFlowAgent, etc.
-│   │   ├── tools/             # github_fetcher, code_parser, etc.
-│   │   └── orchestrator.py    # Agent coordination logic
-│   ├── retrieval/             # Hybrid + graph-aware retrieval
-│   ├── graph/                 # Code relationship modeling
-│   ├── parsers/               # Tree-sitter AST parsing
-│   └── main.py                # FastAPI application
-├── tests/                     # Unit and integration tests
-├── docs/                      # Design docs, PRD, screenshots
-└── docker-compose.yml         # Local infrastructure
+src/codegraph/
+├── agent/                         # Multi-Agent System
+│   ├── base.py                    # BaseAgent, AgentTrace, ToolCall abstractions
+│   ├── stages/                    # 4 Specialized Agents
+│   │   ├── overview_agent.py      #   Stage 1: Repo positioning & architecture
+│   │   ├── mainflow_agent.py      #   Stage 2: Core execution path tracing
+│   │   ├── showcase_agent.py      #   Stage 3: Design pattern highlights
+│   │   └── takeaway_agent.py      #   Stage 4: Reusable pattern extraction
+│   ├── memory/                    # 3-Tier Memory Architecture
+│   │   ├── base.py                #   MemoryEntry, MemoryType, MemoryBackend ABC
+│   │   ├── short_term.py          #   Working memory (OrderedDict, LRU, token-budget)
+│   │   ├── long_term.py           #   Persistent store (Qdrant vectors + Redis index)
+│   │   └── manager.py             #   Unified facade + consolidation (STM → LTM)
+│   ├── execution/                 # Dual Execution Modes
+│   │   ├── react_executor.py      #   ReAct loop (Think→Act→Observe, anti-loop)
+│   │   ├── plan_executor.py       #   Plan-Execute (decompose→DAG→replan)
+│   │   └── mode_selector.py       #   Adaptive routing (heuristic + LLM fallback)
+│   ├── compression/               # Context Window Management
+│   │   ├── strategies.py          #   4 strategies: Window, Summary, Entity, Hybrid
+│   │   └── context_manager.py     #   Auto-compress at 80% utilization
+│   ├── communication/             # Multi-Agent Communication
+│   │   ├── bus.py                 #   Pub/Sub message bus (Redis Streams / asyncio)
+│   │   ├── protocol.py            #   SharedState blackboard + coordination patterns
+│   │   └── guardrails.py          #   Loop/Drift/Runaway detection & prevention
+│   ├── session/                   # Session Lifecycle
+│   │   └── manager.py             #   State machine, Redis persistence, fork support
+│   ├── skills/                    # Composable Skill System
+│   │   └── registry.py            #   Trigger-based activation, dependency resolution
+│   ├── tools/                     # Dynamic Tool System
+│   │   ├── loader.py              #   Schema-driven discovery & dispatch
+│   │   ├── github_fetcher.py      #   Repository tree/file/readme fetching
+│   │   ├── code_parser.py         #   AST-based structure parsing
+│   │   ├── call_graph_tracer.py   #   Execution flow tracing
+│   │   └── pattern_matcher.py     #   Design pattern recognition
+│   └── analysis_orchestrator.py   # Pipeline: Overview→(MainFlow∥Showcase)→Takeaway
+├── retrieval/                     # Hybrid RAG
+│   ├── hybrid.py                  #   Vector + Keyword fusion
+│   ├── vector_retriever.py        #   Qdrant semantic search
+│   └── graph_retriever.py         #   Neo4j structural retrieval
+├── api/                           # FastAPI REST + WebSocket
+├── llm/                           # LLM client (OpenAI-compatible, streaming)
+├── graph/                         # Neo4j code graph (async, pooled)
+├── storage/                       # Redis cache + Qdrant vector store
+└── observability/                 # Structlog + OpenTelemetry tracing
 ```
+
+> 📖 **[Full Architecture Documentation →](./docs/architecture/AGENT_ARCHITECTURE.md)** — Deep dive into design decisions, trade-offs, and system diagrams.
 
 ---
 
 ## Roadmap
 
-- [ ] Enhanced call graph accuracy for large TypeScript/Python repos
-- [ ] Multi-file pattern detection (e.g., middleware chains across files)
-- [ ] GitHub issue/PR context integration
-- [ ] Export learning maps as Markdown or PDF
-- [ ] Public backend deployment for full end-to-end hosted demo
-- [ ] Example analyses for popular repos (React, FastAPI, LangChain)
+**Completed:**
+- [x] 3-tier memory system (short-term / long-term / consolidation)
+- [x] Dual execution modes (ReAct + Plan-Execute) with adaptive selection
+- [x] Long-context compression (4 strategies, hybrid default)
+- [x] Multi-agent communication (pub/sub bus + blackboard shared state)
+- [x] Agent guardrails (loop detection, drift prevention, runaway protection)
+- [x] Dynamic tool loading with JSON Schema validation
+- [x] Trigger-based skill system with composition
+- [x] Session management with state machine and fork support
+
+**Next:**
+- [ ] Multi-model routing (cheap model for simple, expensive for complex)
+- [ ] Distributed agent execution via Celery workers
+- [ ] Skill marketplace (community-contributed skills)
+- [ ] Streaming agent execution (WebSocket real-time progress)
+- [ ] Memory decay with time-based importance weighting
+- [ ] Cross-session knowledge transfer (user's learning profile)
 
 ---
 
