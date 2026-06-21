@@ -141,6 +141,112 @@ async def get_traces(task_id: str) -> dict:
     return {"task_id": task_id, "traces": result.get("_traces", {})}
 
 
+@router.get("/repos/{task_id}/traces/debug")
+async def get_debug_traces(task_id: str):
+    """Enhanced trace view: real execution debugging data.
+
+    Returns structured breakdown of every tool call, LLM invocation,
+    timing, and failure recovery — the kind of data you'd look at
+    when debugging why an agent produced a bad result.
+    """
+    record = await analysis_store.get(task_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if record.get("status") not in ("done", "failed"):
+        raise HTTPException(status_code=409, detail="Analysis still running")
+
+    traces = record.get("result", {}).get("_traces", {})
+
+    debug_view = {
+        "task_id": task_id,
+        "summary": {
+            "total_stages": len(traces),
+            "total_tool_calls": sum(
+                len(t.get("tool_calls", [])) for t in traces.values()
+            ),
+            "total_llm_calls": sum(
+                t.get("llm_calls", 0) for t in traces.values()
+            ),
+            "total_tokens": sum(
+                t.get("total_tokens", 0) for t in traces.values()
+            ),
+            "total_duration_ms": sum(
+                (t.get("finished_at", 0) - t.get("started_at", 0)) * 1000
+                for t in traces.values()
+                if t.get("finished_at") and t.get("started_at")
+            ),
+        },
+        "stages": {},
+    }
+
+    for stage_name, trace in traces.items():
+        stage_debug = {
+            "started_at": trace.get("started_at"),
+            "finished_at": trace.get("finished_at"),
+            "duration_ms": (
+                (trace.get("finished_at", 0) - trace.get("started_at", 0)) * 1000
+                if trace.get("finished_at") and trace.get("started_at")
+                else None
+            ),
+            "status": "failed" if trace.get("error") else "success",
+            "error": trace.get("error"),
+            "tool_calls": [
+                {
+                    "tool": tc.get("tool_name"),
+                    "args_preview": str(tc.get("args", {}))[:200],
+                    "result_preview": str(tc.get("result", ""))[:300],
+                    "duration_ms": tc.get("duration_ms", 0),
+                    "error": tc.get("error"),
+                    "success": tc.get("error") is None,
+                }
+                for tc in trace.get("tool_calls", [])
+            ],
+            "llm_calls": [
+                {
+                    "prompt_chars": lc.get("prompt_chars", 0),
+                    "response_chars": lc.get("response_chars", 0),
+                    "tokens_in": lc.get("tokens_in", 0),
+                    "tokens_out": lc.get("tokens_out", 0),
+                    "duration_ms": lc.get("duration_ms", 0),
+                    "model": lc.get("model", "unknown"),
+                }
+                for lc in trace.get("llm_calls_detail", [])
+            ],
+            "token_breakdown": {
+                "total": trace.get("total_tokens", 0),
+                "by_tool": {},
+            },
+        }
+
+        for tc in trace.get("tool_calls", []):
+            tool_name = tc.get("tool_name", "unknown")
+            stage_debug["token_breakdown"]["by_tool"][tool_name] = (
+                stage_debug["token_breakdown"]["by_tool"].get(tool_name, 0)
+                + tc.get("token_cost", 0)
+            )
+
+        debug_view["stages"][stage_name] = stage_debug
+
+    if debug_view["stages"]:
+        earliest = min(
+            s.get("started_at", float("inf"))
+            for s in debug_view["stages"].values()
+            if s.get("started_at")
+        )
+        debug_view["waterfall"] = [
+            {
+                "stage": name,
+                "offset_ms": (s.get("started_at", earliest) - earliest) * 1000,
+                "duration_ms": s.get("duration_ms", 0),
+                "status": s.get("status"),
+            }
+            for name, s in debug_view["stages"].items()
+            if s.get("started_at")
+        ]
+
+    return debug_view
+
+
 # --- helpers ---
 
 

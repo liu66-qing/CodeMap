@@ -23,6 +23,12 @@ try:
 except ImportError:
     _MEMORY_AVAILABLE = False
 
+try:
+    from codegraph.agent.skills.registry import SkillRegistry, Skill, SkillTrigger
+    _SKILLS_AVAILABLE = True
+except ImportError:
+    _SKILLS_AVAILABLE = False
+
 logger = structlog.get_logger()
 
 
@@ -158,6 +164,60 @@ class AgentExecutionEngine:
             self._memory = None
             self._context_manager = None
 
+        # Skill registry — provides pre-built prompt templates for recognized intents
+        self._skills: "SkillRegistry | None" = None
+        if _SKILLS_AVAILABLE:
+            self._skills = SkillRegistry()
+            self._register_default_skills()
+
+    def _register_default_skills(self):
+        """Register built-in skills for common query patterns."""
+        if not self._skills:
+            return
+
+        from codegraph.agent.skills.registry import Skill, SkillTrigger
+
+        self._skills.register(
+            Skill(
+                name="explain_function",
+                description="Explain what a specific function or method does",
+                trigger_type=SkillTrigger.REGEX,
+                trigger_pattern=r"(?:what does|explain|how does)\s+\w+",
+                prompt_template="Analyze the function '{entity}': purpose, parameters, return value, side effects.",
+                category="code_understanding",
+                examples=["what does parse_config do", "explain the authenticate method"],
+            ),
+            executor=self._skill_executor,
+        )
+        self._skills.register(
+            Skill(
+                name="trace_flow",
+                description="Trace execution flow from entry point",
+                trigger_type=SkillTrigger.REGEX,
+                trigger_pattern=r"(?:trace|flow|call chain|how is .+ called)",
+                prompt_template="Trace the execution flow starting from '{entity}'. Show the call chain.",
+                category="code_understanding",
+                examples=["trace the request flow", "how is validate_token called"],
+            ),
+            executor=self._skill_executor,
+        )
+        self._skills.register(
+            Skill(
+                name="find_pattern",
+                description="Find design patterns in code",
+                trigger_type=SkillTrigger.REGEX,
+                trigger_pattern=r"(?:pattern|design|architecture|how is .+ structured)",
+                prompt_template="Identify the design pattern used in '{entity}' and explain why.",
+                category="architecture",
+                examples=["what pattern does the auth module use", "how is the plugin system structured"],
+            ),
+            executor=self._skill_executor,
+        )
+
+    async def _skill_executor(self, **context) -> str:
+        """Default skill executor — enriches the query with skill context."""
+        return context.get("dependency_results", {}).get("prompt", "")
+
     async def run(self, question: str, session_context: str = "") -> AgentResponse:
         memory = WorkingMemory(question=question)
         state = AgentState.PLANNING
@@ -186,6 +246,14 @@ class AgentExecutionEngine:
                     messages.append({"role": "system", "content": f"Relevant memory:\n{memory_context}"})
             except Exception as e:
                 logger.warning("memory_recall_failed", error=str(e))
+
+        # Skill matching — use registered skill template if query matches
+        if self._skills:
+            matched_skills = self._skills.match(question)
+            if matched_skills:
+                skill = matched_skills[0]
+                # Inject skill context into system prompt
+                session_context = f"{session_context}\n\n[Skill: {skill.name}] {skill.prompt_template}"
 
         while state not in (AgentState.DONE, AgentState.FAILED):
             memory.state_history.append(state.value)
