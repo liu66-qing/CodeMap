@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from codegraph.api.v1 import (
     documents,
@@ -12,6 +12,7 @@ from codegraph.api.v1 import (
     learning,
     agent_stats,
 )
+from codegraph.api.security import require_admin_api_key
 
 api_router = APIRouter()
 
@@ -22,7 +23,12 @@ v1_router.include_router(query.router, prefix="/query", tags=["query"])
 v1_router.include_router(graph.router, prefix="/graph", tags=["graph"])
 v1_router.include_router(conflicts.router, prefix="/conflicts", tags=["conflicts"])
 v1_router.include_router(timeline.router, prefix="/timeline", tags=["timeline"])
-v1_router.include_router(admin.router, prefix="/admin", tags=["admin"])
+v1_router.include_router(
+    admin.router,
+    prefix="/admin",
+    tags=["admin"],
+    dependencies=[Depends(require_admin_api_key)],
+)
 v1_router.include_router(analysis.router, prefix="/analysis", tags=["analysis"])
 v1_router.include_router(learning.router, prefix="/learning", tags=["learning"])
 v1_router.include_router(agent_stats.router)

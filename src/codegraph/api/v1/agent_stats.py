@@ -1,8 +1,9 @@
 """Agent trace and tool statistics API endpoints."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from typing import Any
 
+from codegraph.api.security import require_admin_api_key, require_confirmation
 from codegraph.agent.tools.stats import tool_stats_collector
 
 router = APIRouter(prefix="/agent", tags=["agent"])
@@ -45,8 +46,9 @@ async def get_agent_tool_usage(agent_name: str) -> dict[str, int]:
     return usage
 
 
-@router.post("/tools/stats/reset")
-async def reset_tool_stats() -> dict[str, str]:
+@router.post("/tools/stats/reset", dependencies=[Depends(require_admin_api_key)])
+async def reset_tool_stats(confirmation: str = "") -> dict[str, str]:
     """Reset all tool statistics (admin only)."""
+    require_confirmation(confirmation, "RESET_TOOL_STATS")
     tool_stats_collector.reset()
     return {"message": "Tool statistics reset successfully"}

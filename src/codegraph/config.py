@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     app_host: str = "0.0.0.0"
     app_port: int = 8080
     secret_key: str = "change-me-in-production"
+    admin_api_key: str = ""
 
     # LLM (DeepSeek / OpenAI-compatible)
     llm_api_key: str = ""

@@ -6,10 +6,11 @@ import uuid
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from pydantic import BaseModel
 import structlog
 
+from codegraph.api.security import require_admin_api_key, require_confirmation
 from codegraph.models.domain import DocumentStatus
 from codegraph.models.api_schemas import DocumentUploadResponse, DocumentDetail
 
@@ -92,7 +93,8 @@ async def get_document(doc_id: str) -> DocumentDetail:
     raise HTTPException(status_code=404, detail="Document not found")
 
 
-@router.delete("/{doc_id}")
-async def delete_document(doc_id: str) -> dict[str, str]:
+@router.delete("/{doc_id}", dependencies=[Depends(require_admin_api_key)])
+async def delete_document(doc_id: str, confirmation: str = "") -> dict[str, str]:
+    require_confirmation(confirmation, f"DELETE_DOCUMENT:{doc_id}")
     logger.info("document_deleted", doc_id=doc_id)
     return {"status": "deleted", "id": doc_id}

@@ -1,8 +1,8 @@
-.PHONY: run dev test lint format migrate docker-up docker-down
+.PHONY: run dev test evals lint format migrate docker-up docker-down
 
 # Development
 run:
-	uvicorn src.evograph.main:app --host 0.0.0.0 --port 8080 --reload
+	uvicorn codegraph.main:app --host 0.0.0.0 --port 8080 --reload
 
 dev: docker-up run
 
@@ -15,15 +15,18 @@ docker-down:
 
 # Testing
 test:
-	pytest tests/ -v --cov=src/evograph
+	pytest tests/ -v --cov=src/codegraph
 
 test-unit:
 	pytest tests/unit/ -v
 
+evals:
+	python -m evals.run_evals
+
 # Code quality
 lint:
 	ruff check src/ tests/
-	mypy src/evograph/
+	mypy src/codegraph/
 
 format:
 	ruff format src/ tests/
@@ -38,7 +41,7 @@ migrate-new:
 
 # Celery worker
 worker:
-	celery -A src.evograph.tasks.celery_app worker --loglevel=info
+	celery -A codegraph.tasks.celery_app worker --loglevel=info
 
 # Frontend
 frontend-dev:
